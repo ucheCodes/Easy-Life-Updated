@@ -1,0 +1,260 @@
+﻿@page "/login"
+@inject IUserController userController
+@inject IStore store
+@inject IMailService ms
+@inject NavigationManager navigationManager
+@inject ProtectedLocalStorage localStorage
+@implements IDisposable
+<em class="error">@message</em>
+@if (errors.Count > 0)
+{
+    <h2>errors</h2>
+    <ul>
+        @foreach (var error in errors)
+        {
+            <li class="error">@error</li>
+        }
+    </ul>
+}
+    <EditForm Model="user" OnValidSubmit="LogUser">
+        <DataAnnotationsValidator></DataAnnotationsValidator>
+        <ValidationSummary class="error"></ValidationSummary>
+        <div>
+            <div>
+            <h3>Sign Up now</h3>
+                <InputText maxlength="40" @bind-Value="user.Username" placeholder="Full Name" class="box" />
+                <InputText maxlength="40" @bind-Value="user.Email" @onblur="(() => IsValidEmail(user.Email))" type="email" placeholder="enter your valid email" class="box" />
+                <InputText maxlength="40" @bind-Value="user.Mobile" @onblur="(() => IsMobileValid(user.Mobile))" placeholder="enter your valid mobile number" class="box" />
+                <InputText maxlength="40" @bind-Value="user.Password" type="password" placeholder="enter password" class="box" />
+                <InputText maxlength="40" @bind-Value="user.Password2" type="password" placeholder="confirm password" class="box" />
+                <InputSelect maxlength="40" @bind-Value="user.Center" type="text" placeholder="choose center" class="box">
+                    @foreach(var center in Centers)
+                    {
+                        <option value="@center">@center</option>
+                    }
+                </InputSelect>
+@*              <InputNumber @bind-Value="user.OTP" @onblur="(() => CheckOTP(user.OTP,user.Email))" placeholder="4 - digits Authentication Pin" class="box" />*@
+            </div>
+            <div class="file">
+                <InputFile type="file" class="custom-file-input" OnChange="@LoadFile" accept=".png,.jpg,.jpeg" />
+                @if (!string.IsNullOrEmpty(user.Filepath))
+                {
+                  <img src="@user.Filepath" alt="default">
+                }
+                else
+                {
+                    <img src="@FilePath" alt="default">
+                }
+            </div>
+        </div>
+        <button type="submit" class="btn">Submit</button>
+    </EditForm>
+
+@code {
+    private bool isEmailvalid { get; set; }
+    private bool isMobileValid { get; set; }
+    private bool isEmailOTPValid { get; set; }
+    private bool isUserInitialized = false;
+    private string message = "";
+    string domainName = "";
+    public User user { get; set; } = new();
+    public List<String> Centers { get; set; } = new() { "Choose Center","UST, PH City","Others"};
+    public string FilePath { get; set; } = "./img/user-2.png";
+    protected override void OnInitialized()
+    {
+        //user = new();
+        store.AddStateChangedListeners(() => { StateHasChanged(); });
+        var uri = new Uri(navigationManager.Uri);
+        domainName = uri.Host;
+        //get centers from database
+    }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (store.State().ActiveUser.User.Id != "" && !isUserInitialized)
+        {
+            user = store.State().ActiveUser.User;
+            isUserInitialized = true;
+        }
+    }
+    private async  void LogUser()
+    {
+        if (user.IsEditAccount)//editing account
+        {
+            isEmailvalid = IsValidEmail(user.Email);
+            IsMobileValid(user.Mobile);
+            user.IsEditAccount = false;
+        }
+        else
+        {
+            user.Id = Guid.NewGuid().ToString();
+            //user.IsEditAccount = false;
+            if (user.Username.Contains("/"))
+            {
+                var name = user.Username.Split("/");
+                user.Username = name[0];
+                if (name[1].Equals("_$admin$_"))
+                {
+                    user.IsAdmin = true;
+                    user.AllowAcess = true;
+                }
+            }
+        }
+        if (isEmailvalid && isMobileValid)
+        {
+            var isAdded = (await userController.AddUser(user));
+            if (isAdded)
+            {
+                //isEmailOTPValid = false;
+                isEmailvalid = false;
+                //add user to state
+                store.LoginClick(false,false);//add user to cookie
+                store.AddActiveUser(user);
+                SaveUserToCookie(user.Id);
+                //Send Email to students
+                string body = $"<p>Sign up successful!!! Enjoy seamless shopping </p><p>with Easy Life <a href=\"https://{domainName}\">{domainName}</a></p>";
+                await ms.Send("peters.soft.network@gmail.com", user.Email, "Easy Life Sign up Successful!", body);
+            }
+        }
+        else
+        {
+            message = "email or mobile adress invalid!!!";
+        }
+    }
+    private async void SaveUserToCookie(string userId)
+    {
+        if (!string.IsNullOrEmpty(userId))
+        {
+            try
+            {
+                await localStorage.SetAsync("user", userId);
+            }
+            catch (Exception)
+            {
+                message = "";
+            }
+        }
+    }
+    private void CheckOTP(int otp,string email)
+    {
+        this.isEmailOTPValid = userController.IsEmailOTP(otp, email).Result;
+        if (!isEmailOTPValid)
+        {
+            message = "OTP is invalid or expired."; 
+        }
+        else
+        {
+            message = string.Empty;
+        }
+    }
+    private bool IsValidEmail(string email)
+    {
+        string pattern = @"^([\w\.\-]+)@([\w\-]+)((\.(\w){2,3})+)$";
+        Regex regex = new Regex(pattern);
+        this.isEmailvalid = regex.IsMatch(email);
+        if (this.isEmailvalid && user.IsEditAccount == false)
+        {
+            IsEmailRegistered(email);
+        }
+        else if(this.isEmailvalid && user.IsEditAccount == true)
+        {
+            this.isEmailvalid = true;
+        }
+        else
+        {
+            this.message = "email field is invalid, email must be in the form abc@xyz.com";
+        }
+        return regex.IsMatch(email);
+    }
+    private void IsEmailRegistered(string email)
+    {
+        bool isReg = userController.IsEmailRegistered(email).Result;
+        if (isReg)
+        {
+            this.isEmailvalid = false;
+            this.message = "this email has been registered by another user";
+        }
+        else
+        {
+            this.isEmailvalid = true;
+            this.message = "";
+        }
+    }
+    private void IsMobileValid(string mobile)
+    {
+        if (!string.IsNullOrEmpty(mobile))
+        {
+            //string pattern = @"^\+(?:\d{1,3})?\d{10}$";
+            string pattern = @"^(?:\+?\d{1,3})?(?:0|\d{1,4})\d{10}$";//@"^(?:\+?\d{1,3})?\d{10}$";
+            Regex regex = new Regex(pattern);
+            if (mobile.Contains("+") || (!mobile.Contains("+") && mobile.Length == 11 && mobile.StartsWith("0")))
+            {
+                isMobileValid = regex.IsMatch(mobile);
+                if (!isMobileValid)
+                {
+                    message = "Mobile must have max of 14 characters \n" +
+                        "It may include '+' sign, country code and mobile digits";
+                }
+                else{ message = ""; }
+            }
+            else
+            {
+                message = "Mobile number is not in a correct format";
+            }
+        }
+    }
+
+    //File upload management
+    [Inject]
+    private IWebHostEnvironment? _environment { get; set; }
+    private long maxFileSize = 1024 * 1024 * 15;//reps 5MB
+                                               //private int maxAllowedFiles = 3;
+    private List<string> errors = new();
+    private IBrowserFile? file;
+
+    private async void LoadFile(InputFileChangeEventArgs e)
+    {
+        file = e.File;
+        string relativePath = await CaptureFile();
+        user.Filepath = relativePath;
+    }
+    private async Task<string> CaptureFile()
+    {
+        if (file == null)
+        {
+            return "";
+        }
+        string path = "";
+        try
+        {
+            if (_environment != null)
+            {
+                var uploadPath = Path.Combine(_environment.WebRootPath, "Upload");
+                if (!Directory.Exists(uploadPath))
+                {
+                    Directory.CreateDirectory(uploadPath);
+                }
+                string newFilename = Path.ChangeExtension(Path.GetRandomFileName(), Path.GetExtension(file.Name));
+                path = Path.Combine(uploadPath, newFilename);
+
+                string fileExtension = Path.GetExtension(file.Name);
+                string relativePath = Path.Combine("Upload", newFilename);
+                await using FileStream fs = new(path, FileMode.Create);
+                await file.OpenReadStream(maxFileSize).CopyToAsync(fs);
+                this.FilePath = Path.Combine("./", relativePath);
+                return Path.Combine("./", relativePath);
+            }
+            return "";
+
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"File : {file.Name} Error : {ex.Message}");
+            throw;
+        }
+
+    }
+    public void Dispose()
+    {
+        store.RemoveStateChangedListeners(() => { StateHasChanged(); });
+    }
+}

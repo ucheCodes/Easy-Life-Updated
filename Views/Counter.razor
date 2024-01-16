@@ -1,0 +1,60 @@
+﻿<div class="counter mt-5">
+    <div @onmouseover="EndCount" class="container">
+        <div class="row text-center">
+            <div class="col-md-3 mb-lg-0 mb-md-0 mb-5">
+                <h1>
+                    <span id="count1"></span>@counter1+
+                </h1>
+                <p>Orders</p>
+            </div>
+            <div class="col-md-3 mb-lg-0 mb-md-0 mb-5">
+                <h1>
+                    <span id="count2"></span>@counter2+
+                </h1>
+                <p>Deliveries</p>
+            </div>
+            <div class="col-md-3 mb-lg-0 mb-md-0 mb-5">
+                <h1>
+                    <span id="count3"></span>@counter3+
+                </h1>
+                <p>Star ratings</p>
+            </div>
+            <div class="col-md-3 mb-lg-0 mb-md-0 mb-5">
+                <h1>
+                    <span id="count4"></span>@counter4+
+                </h1>
+                <p>Customers</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int counter1 = 1;
+    private int counter2 = 2;
+    private int counter3 = 3;
+    private int counter4 = 5;
+    private Timer? timer;
+    bool stopCount = false;
+
+    protected override void OnInitialized()
+    {
+        timer = new Timer(_ => CountThrough(), null, 500, 500);
+    }
+
+    public void CountThrough()
+    {
+        if (!stopCount && counter1 < 1500)
+        {
+            counter1 += 5;
+            counter2 += 3;
+            counter3 += 2;
+            counter4 += 1;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+    private void EndCount()
+    {
+        stopCount = true;
+    }
+}

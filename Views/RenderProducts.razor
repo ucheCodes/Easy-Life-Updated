@@ -1,0 +1,106 @@
+﻿@*<div class="box-container">
+    @foreach (var product in store.State().ProductItems.Products)
+    {
+        <div class="box">
+            @if (!string.IsNullOrWhiteSpace(product.Filepath))
+            {
+                <div>
+                    <small>@product.Date.ToString("ddd, dd MMM yyyy")</small>
+                    <small>@product.Date.ToString("hh : mm tt")</small>
+                </div>
+                <div @onclick="(() => View(product.Id))" class="img">
+                    <img src="@product.Filepath" alt="product">
+                </div>
+                <div class="icons">
+                    @if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id) && store.State().ActiveUser.User.AllowAcess)
+                    {
+                        <i @onclick="(() => {showDel =! showDel; deleteId = product.Id;})" class="fas fa-trash"></i>
+                        <i @onclick="(() => EditProduct(product))" class="fa-solid fa-pen-to-square"></i>
+                        @if (showDel && product.Id == deleteId)
+                        {
+                            <span>Confirm <i @onclick="(() => DeleteProduct(product.Id))" class="fas fa-trash"></i></span>
+                        }
+                    }
+                </div>
+                <h3>
+                    @product.Name &nbsp;&nbsp;
+                    <i @onclick="(() =>AddToCart(product))" class="fas fa-shopping-cart"></i>
+                </h3>
+                <p>@naira @product.Price</p>
+                <button @onclick="(() =>ShowAndAddToCart(product))" class="btn">Buy Now</button>
+            }
+        </div>
+    }
+</div>*@
+
+
+
+
+@*@for (int i = 1; i < 5; i++)
+{
+    //Mathematical code logic to render ads and products within different loops
+    if (i < 4)
+        range = increment * i;
+    else
+        range = store.State().ProductItems.Products.Count;//render products to the end
+    if (productIndex < store.State().ProductItems.Products.Count)
+    {
+        productAfterAdsCount = 0;
+        <div class="box-container">
+            @for (int j = productIndex; j < store.State().ProductItems.Products.Count; j++)
+            {
+                productAfterAdsCount++;
+                if (j == range) break;//store.State().ProductItems.
+                var product = products[productIndex];
+                <div class="box">
+                    @if (!string.IsNullOrWhiteSpace(product.Filepath))
+                    {
+                        <div>
+                            <small>@product.Date.ToString("ddd, dd MMM yyyy")</small>
+                            <small>@product.Date.ToString("hh : mm tt")</small>
+                        </div>
+                        <div @onclick="(() => View(product.Id))" class="img">
+                            <img src="@product.Filepath" alt="product">
+                        </div>
+                        <div class="icons">
+                            @if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id) && store.State().ActiveUser.User.AllowAcess)
+                            {
+                                <i @onclick="(() => showDel =! showDel)" class="fas fa-trash"></i>
+                                <i @onclick="(() => EditProduct(product))" class="fa-solid fa-pen-to-square"></i>
+                                @if (showDel)
+                                {
+                                    <span>Confirm Delete <i @onclick="(() => DeleteProduct(product.Id))" class="fas fa-trash"></i></span>
+                                }
+                            }
+                        </div>
+                        <h3>
+                            @product.Name &nbsp;&nbsp;
+                            <i @onclick="(() =>AddToCart(product))" class="fas fa-shopping-cart"></i>
+                        </h3>
+                        <p>@naira @product.Price</p>
+                        <button @onclick="(() =>ShowAndAddToCart(product))" class="btn">Buy Now</button>
+                    }
+                </div>
+                productIndex++;
+            }
+        </div>
+        if (productAfterAdsCount >= 3)
+        {
+            switch (i)
+            {
+                case 1:
+                    <Ads section="products" />
+                    break;
+                case 2:
+                    <Counter />
+                    break;
+                case 3:
+                    <Ads />
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+    else { break; }
+}  *@

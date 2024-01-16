@@ -1,0 +1,214 @@
+﻿@page "/orders"
+@inject IOrderController orderController
+@inject IProductController productController
+@inject NavigationManager navigationManager
+@inject HttpClient httpClient
+
+<section class="dynamic-table">
+    <div class="table-header">
+        <h1 class="heading">Orders &<span>Transactions</span></h1>
+    </div>
+<p class="p">Do well to verify transactions and ensure the verification status is checked <i class="fa-solid fa-check"></i> before delivery to clients</p>
+@if (message == "valid")
+{
+    <em class="valid">Transaction success potential is 60% ... Await system's final approval within 24 hours</em>
+}
+else if (message == "error")
+{
+    <em class="error">Transaction success potential is 10% ... Await system's final approval within 24 hours</em>
+}
+<div class="table @tableSizeClass">
+@if(orders.Count  > 0){
+    <div class="table-body">
+    <table>
+        <thead>
+            <tr>
+                <th>S/N</th>
+                <th>Reference</th>
+                <th>Access Code</th>
+                <th>Email</th>
+                <th>Mobile</th>
+                <th>Is Verified</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>View Product</th>
+                <th>Delivery Status</th>
+                <th>Verify</th>
+            </tr>
+        </thead>
+        <tbody>
+            @{int count = 0;
+            foreach (var order in orders)
+            {
+                <tr>
+                    <td>@count</td>
+                    <td>@order.Reference</td>
+                    <td>@order.AccessCode</td>
+                    <td>@order.Email</td>
+                    <td>@order.Mobile</td>
+                    @if (order.IsValid)
+                    {
+                        <td class="icon"><i class="fa-solid fa-check"></i></td>
+                    }
+                    else
+                    {
+                        <td class="icon"><i class="fa-solid fa-x"></i></td>
+                    }
+                    <td>@order.Date.ToString("ddd, dd MMM yyyy")</td>
+                    <td>@order.Date.ToString("hh : mm : ss tt")</td>
+                    <td class="icon" @onclick="(() => View(order.Reference))"><i class="fa-solid fa-eye"></i></td>
+                    @if (order.IsValid)
+                    {
+                         if (order.IsDelivered)
+                        {
+                           <td>is delivered : <i class="fa-solid fa-check"></i></td>
+                        }
+                        else
+                        {
+                            <td>confirm: <input @onchange="(() => OrderDelivery(order))" type="checkbox"/></td>        
+                        }
+                    }
+                    else
+                    {
+                        <td>is delivered? <i class="fa-solid fa-x"></i></td>
+                    }
+                    @if (!order.IsValid)
+                    {
+                        @if (clickedOrder == order.Reference)
+                        {
+                            <td class="status pending" @onclick="(() => ViewVerified(order.Reference))"><p class="p">View Pending ...</p></td>       
+                        }
+                        else
+                        {
+                            <td><button class="btn" @onclick="(() => Verify(order.Reference,order.Date))">Verify</button></td>
+                        }
+                    }
+                    else
+                    {
+                        <td class="status success" @onclick="(() => ViewVerified(order.Reference))"><p class="p">View Payment Details</p></td>
+                    }
+                </tr>
+                count++;
+            }
+            }
+        </tbody>
+    </table>
+    </div>
+}
+</div>
+</section>
+
+
+@code{
+    List<Orders> orders = new List<Orders>();
+    string message = "";
+    string clickedOrder = "";
+    string paystack_public_key = "";
+    string tableSizeClass = "scanty";
+    string paystack_secret_key = "";//"sk_test_f2fe38be54d1f55fd08bedc1d8b4a218b11f13d4";
+    protected override async Task OnInitializedAsync()
+    {
+        GetPaystackKeys();
+        orders = (await orderController.GetAllOrders()).OrderByDescending(x => x.Date).ToList<Orders>();
+        if (orders.Count > 5)
+            tableSizeClass = "large";
+    }
+    private async void GetPaystackKeys()
+    {
+        var dict = await productController.GetPaystackKeys();
+        if (dict != null && dict.Count > 0)
+        {
+            paystack_public_key = dict["public"];
+            paystack_secret_key = dict["secret"];
+        }
+    }
+    public async void OrderDelivery(Orders order)
+    {
+        order.IsDelivered = !order.IsDelivered;
+        var isAdded = await orderController.AddPendingOrder(order);
+    }
+    private void View(string id)
+    {
+        navigationManager.NavigateTo($"/order-products/{id}");
+    }
+    private void ViewVerified(string reference)
+    {
+        navigationManager.NavigateTo($"/verify/{reference}");
+    }
+    private async void Verify(string reference, DateTime date)
+    {
+        if (!string.IsNullOrEmpty(paystack_secret_key) && !string.IsNullOrEmpty(reference))
+        {
+            using (var request = new HttpRequestMessage(HttpMethod.Get, "https://api.paystack.co/transaction/verify/" + reference))
+            {
+                try
+                {
+                    request.Headers.Add("Authorization", $"Bearer {paystack_secret_key}");
+
+                    clickedOrder = reference;
+                    var response = await httpClient.SendAsync(request);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string responseContent = await response.Content.ReadAsStringAsync();
+                        if (responseContent != null)
+                        {
+                            dynamic responseObject = JsonConvert.DeserializeObject<dynamic>(responseContent) ?? "";
+                            var data = responseObject.data;
+                            string cd = data.createdAt;
+                            PaystackTransaction pt = new PaystackTransaction()
+                                {
+                                    Reference = data.reference,
+                                    Amount = data.amount / 100,
+                                    Domain = data.domain,
+                                    Status = data.status,
+                                    Bank = data.authorization.bank,
+                                    Bin = data.authorization.bin,
+                                    CardBrand = data.authorization.brand,
+                                    CardExpiry = $"{data.authorization.exp_month} {data.authorization.exp_year}",
+                                    AccountName = data.authorization.account_name,
+                                    CardLastFourDigits = data.authorization.last4,
+                                    Email = data.customer.email,
+                                    Date = date
+                                };
+                            var order = orders.Find(x => x.Reference == reference) ?? new Orders();
+                            if (!string.IsNullOrEmpty(order.Reference) && data.status == "success")
+                            {
+                                order.IsValid = true;
+                                var isAdded = await orderController.AddPendingOrder(order);
+                                var addPt = await orderController.AddPaystackTransaction(pt);
+                                if (isAdded)
+                                {
+                                    orders.Add(order);
+                                    navigationManager.NavigateTo($"/verify/{reference}");
+                                }
+                                message = "valid";
+                            }
+                            else
+                            {
+                                var addPt = await orderController.AddPaystackTransaction(pt);
+                                var ord = orders.FirstOrDefault(x => x.Reference == reference);
+                                if (ord != null && DateTime.Now.Subtract(ord.Date).TotalDays >= 1)
+                                {
+                                    bool isDel = (orderController.DeleteOrder(reference)).Result;
+                                    if (isDel)
+                                    {
+                                        if (orders.Any(o => o.Reference.Equals(ord.Reference)))
+                                        {
+                                            orders.Remove(ord);
+                                        }
+                                    }
+                                }
+                                message = "error";
+                            }
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+        }
+    }
+
+}

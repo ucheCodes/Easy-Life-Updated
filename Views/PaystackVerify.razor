@@ -1,0 +1,81 @@
+﻿@page "/verify/{reference}"
+@inject NavigationManager navigationManager
+@inject IOrderController orderController
+
+<section class="dynamic-table">
+    <div class="table-header">
+        <h1 class="heading">Payment <span>Transaction</span></h1>
+    </div>
+<div class="table scanty">
+    <div class="table-body">
+    <table>
+        <thead>
+            <tr>
+                <th>S/N</th>
+                <th>Ref</th>
+                <th>Bank</th>
+                <th>Card</th>
+                <th>Last 4 Digits</th>
+                <th>Expiry</th>
+                <th>Bin</th>
+                <th>Card Name</th>
+                <th>Amount</th>
+                <th>Domain</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (pt != null)
+            {
+                <tr>
+                    <td>@count</td>
+                    <td>@pt.Reference</td>
+                    <td>@pt.Bank</td>
+                    <td>@pt.CardBrand</td>
+                    <td>@pt.CardLastFourDigits</td>
+                    <td>@pt.CardExpiry</td>
+                    <td>@pt.Bin</td>
+                    <td>@pt.AccountName</td>
+                    <td>@pt.Amount</td>
+                    <td>@pt.Domain</td>
+                    <td>@pt.Email</td>
+                    @if(pt.Status == "success")
+                    {
+                        <td class="icon">@pt.Status <i class="fa-solid fa-check"></i></td>
+                    }
+                    else
+                    {
+                        <td class="icon">@pt.Status<i class="fa-solid fa-x"></i></td>
+                    }
+                    <td>@pt.Date.ToString("ddd MMM yyyy")</td>
+                    <td>@pt.Date.ToString("hh : mm : ss tt")</td>
+                </tr>
+                count++;
+            }
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="back">
+    <button @onclick="back" class="center-btn">Back to Orders <i class="fa-sharp fa-solid fa-arrow-right"></i></button>
+</div>
+</section>
+@code{
+    [Parameter]
+    public string reference { get; set; } = "";
+    int count = 0;
+    PaystackTransaction pt = new PaystackTransaction();
+    protected override async Task OnInitializedAsync()
+    {
+        var _pt = await orderController.GetPaystackTransaction(reference);
+        if (_pt != null)
+        {
+            pt = _pt;
+        }
+    }
+    private void back() { navigationManager.NavigateTo("/orders"); }
+}

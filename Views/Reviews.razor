@@ -1,0 +1,152 @@
+﻿@page "/reviews"
+@inject IStore store
+@inject IReviewController rc
+@inject SignalRService signalR
+<section class="review-ad">
+        <Ads />
+</section>
+<section class="review">
+    <h1 class="heading">Product <span>Reviews</span></h1>
+    <span class="rate">
+        rate Us :
+        @for (int i = 1; i < 6; i++)
+        {
+            int id = i;
+            <i @onclick="() => Rate(id)" class="fas fa-star @(i <= selectedRating ? "active" : "")"></i>
+        }
+
+    </span><br/>
+    <span class="error">@message</span>
+    <textarea @bind="comment" placeholder="Kindly drop a review"></textarea>
+    <button @onclick="Submit" class="btn">Submit Comment</button>
+    <div class="comments">
+        @if (reviews.Count > 0)
+        {
+            <h2>@reviews.Count Reviews</h2>
+            foreach (var rev in reviews)
+            {
+                <div class="comment">
+                    <div class="user">
+                        <h4>
+                            @rev.User.Username &nbsp;&nbsp;
+                            @if (store.State().ActiveUser.User.AllowAcess)
+                            {
+                                @if(deleteId == rev.Id)
+                                {
+                                    <span class="error">confirm: <i @onclick="(()=> Delete(rev.Id))" class="fas fa-trash" /></span>
+                                    <span class="error">cancel: <i @onclick="(()=> {deleteId = string.Empty;})" class="fas fa-x"></i></span>
+                                }
+                                else
+                                {
+                                    <i @onclick="(()=> {deleteId = rev.Id;})" class="fas fa-trash" />
+                                }
+                            }
+                        </h4>
+                        @if (rev.User.Filepath != "")
+                        {
+                            <img src="@rev.User.Filepath" />
+                        }
+                        else
+                        {
+                            <img src="./img/user-2.png" />
+                        }
+                    </div>
+                    @if (rev.StarRating > 0)
+                    {
+                        <span class="rate">
+                        @for (int i = 0; i < rev.StarRating; i++)
+                        {
+                            <i class="fas fa-star active"></i>
+                        }
+                        </span>
+                    }
+                    <p>
+                        @rev.Comment
+                    </p>
+                    <span class="date">@rev.Date.ToString("ddd, dd MMM yyyy hh:mm tt")</span>
+                </div>
+            }
+        }
+        else
+        {
+            <p class="p">No reviews made on this platform yet.</p>
+        }
+    </div>
+</section>
+
+@code {
+    private string comment = "";
+    string message = "";
+    Review review = new();
+    List<Review> reviews = new();
+    int selectedRating = 0;
+    string deleteId = "";
+    public HubConnection hubConnection => signalR.HubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        reviews = (await rc.ReadAll()).OrderByDescending(r => r.Date).ToList();
+        signalR.HubConnection.On<Review>("AddReview", UpdateReviews);
+        signalR.HubConnection.On<string>("DeleteReview", DeleteReview);
+        store.AddStateChangedListeners(() => { StateHasChanged(); });
+    }
+    private void UpdateReviews(Review rev)
+    {
+        reviews.Add(rev);
+        reviews = reviews.OrderByDescending(r => r.Date).ToList();
+        InvokeAsync(StateHasChanged);
+    }
+    private void DeleteReview(string id)
+    {
+        var rev = reviews.Find(r => r.Id.Equals(id));
+        if (rev != null && rev.Id != "")
+        {
+            reviews.Remove(rev);
+            InvokeAsync(StateHasChanged);
+        }
+    }
+    private void Rate(int i)
+    {
+        selectedRating = i;
+    }
+    private async void Delete(string id)
+    {
+        var isDel = await rc.Delete(id);
+        if (isDel)
+        {
+            deleteId = "";
+            await signalR.HubConnection.SendAsync("DeleteReview", id);
+        }
+    }
+    private async void Submit()
+    {
+        if (string.IsNullOrEmpty(store.State().ActiveUser.User.Id))
+        {
+            store.LoginClick(false, true);
+        }
+        else
+        {
+            if (comment != "")
+            {
+                review.Id = Guid.NewGuid().ToString();
+                review.User = store.State().ActiveUser.User;
+                review.Comment = comment;
+                review.Date = DateTime.Now;
+                review.StarRating = selectedRating;
+                var isAdded = await rc.Create(review);
+                if (isAdded)
+                {
+                    await signalR.HubConnection.SendAsync("AddReview", review);
+                    review = new();
+                    comment = "";
+                    message = "";
+                }
+            }
+            else{ message = "kindly type your review!!!"; }
+        }
+    }
+    public void Dispose()
+    {
+        store.RemoveStateChangedListeners(() => { StateHasChanged(); });
+    }
+}

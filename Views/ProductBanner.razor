@@ -1,0 +1,80 @@
+﻿@inject IProductController pc
+@inject IStore store
+@inject NavigationManager navigationManager
+
+<div class="special">
+    <div class="box">
+        <div class="col-2">
+            @if (!string.IsNullOrWhiteSpace(special.Filepath))
+            {
+                <div @onclick="(() => View(special.Id))" class="img">
+                    <img loading="lazy" src="@special.Filepath" alt="product">
+                </div>
+            }
+        </div>
+        <div class="col-2">
+            <h1>@special.Name</h1>
+            <h1>@naira @special.Price.ToString("N0")</h1>
+            <p>
+                @special.Description
+            </p>
+            <button @onclick="(() =>ShowAndAddToCart(special))" class="btn">Buy Now</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    List<Product> products = new();
+    Product special = new();
+    char naira = (char)8358;
+    CancellationTokenSource? cts;
+    Random? rnd;
+    CancellationToken ct;
+    private Timer? timer;
+    protected async override Task OnInitializedAsync()
+    {
+        products = await pc.GetProducts();
+        if (products.Count > 0)
+        {
+            special = products[products.Count - 1];
+            timer = new Timer(_ => ChangeProduct(), null, 8000, 8000);
+        }
+
+        cts = new CancellationTokenSource();
+        ct = cts.Token;
+        //WalkThrough();//I can use this or the timer function above
+    }
+    private void ShowAndAddToCart(Product product)
+    {
+        if (string.IsNullOrEmpty(store.State().ActiveUser.User.Id))
+        {
+            store.LoginClick(false, true);
+        }
+        else
+        {
+            store.AddToCart(product);
+            store.ShowCart(true);
+        }
+    }
+    private async Task WalkThrough()
+    {
+        while (cts != null && !cts.IsCancellationRequested)
+        {
+            //Works but I prefer to use timer because while loops infinitely
+            await Task.Delay(5000);
+            ChangeProduct();
+            await InvokeAsync(() => this.StateHasChanged());
+        }
+    }
+    private void ChangeProduct()
+    {
+        rnd = new Random();
+        int num = rnd.Next(0, products.Count);
+        special = products[num];
+        InvokeAsync(StateHasChanged);//not needed if am to use the WalkThrough method
+    }
+    private void View(string id)
+    {
+        navigationManager.NavigateTo($"/view/{id}");
+    }
+}

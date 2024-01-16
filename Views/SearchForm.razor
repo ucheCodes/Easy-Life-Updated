@@ -1,0 +1,41 @@
+﻿@inject NavigationManager navigationManager
+@inject IStore store
+@inject IProductController productController
+
+<input @bind="searchTerm" @onblur="Search" type="search" id="search-box" placeholder="search for products">
+<label for="search-box" class="fas fa-search"></label>
+
+@code {
+    public string searchTerm { get; set; } = "";
+    public List<Product> products { get; set; } = new();
+    string currentRoute = "";
+
+    protected async override Task OnInitializedAsync()
+    {
+        products = await productController.GetProducts();
+    }
+    private void Search()
+    {
+        // currentRoute = navigationManager.ToBaseRelativePath(navigationManager.Uri);
+        //currentRoute = new Uri(navigationManager.Uri).AbsolutePath;
+        //currentRoute = new Uri(navigationManager.Uri).PathAndQuery;
+        currentRoute = new Uri(navigationManager.Uri).LocalPath;
+        var _products = products.Where(p =>
+            p.Name.ToLower().Contains(searchTerm.ToLower()) ||
+            p.Category.Contains(searchTerm.ToLower())).ToList<Product>();
+        if (_products.Count > 0)
+        {
+            _products = (_products.OrderByDescending(p => p.Date)).ToList<Product>();
+            store.UpdateProducts(_products);
+        }
+        else
+        {
+            products = (products.OrderByDescending(p => p.Date)).ToList<Product>();
+            store.UpdateProducts(products);
+        }
+        if (currentRoute != "/")
+        {
+            navigationManager.NavigateTo("/");
+        }
+    }
+}

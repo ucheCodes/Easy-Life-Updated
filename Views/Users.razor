@@ -1,0 +1,132 @@
+﻿@page "/users"
+@inject IUserController userController
+@inject IProductController productController
+@inject IStore store
+@inject IDatabase database
+@implements IDisposable
+
+<div class="dynamic-table">
+    <div class="table-header">
+        <h1 class="heading">Registered <span>Users</span></h1>
+    </div>
+    <div class="table @tableSizeClass">
+        <div class="table-body">
+            <table>
+                <thead>
+                <tr>
+                    <th>S/N</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Is Admin</th>
+                    <th>Image</th>
+                    @if (store.State().ActiveUser.User != null && store.State().ActiveUser.User.IsAdmin)
+                    {
+                        <th>Has Admin Acess</th>
+                    }
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var user in users)
+                {
+                <tr>
+                    <td>@count</td>
+                    <td>@user.Username</td>
+                    <td>@user.Email</td>
+                    <td>@user.IsAdmin</td>
+                    @if (!string.IsNullOrEmpty(user.Filepath))
+                    {
+                        <td><img src="@user.Filepath" /></td>
+                    }
+                    else
+                    {
+                        <td><img  src="@FilePath" /></td>
+                    }
+                    @if (store.State().ActiveUser.User != null && store.State().ActiveUser.User.IsAdmin)
+                    {
+                        @if (user.AllowAcess)
+                        {
+                            <td>
+                                <input type="checkbox" checked />
+                            </td>
+                        }
+                        else
+                        {
+                            <td>
+                                <input type="checkbox" @onchange="(() => GrantAcess(user))" />
+                            </td>
+                        }
+                    }
+                </tr>
+                count++;
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@if (store.State().ActiveUser.User.Id != "" && store.State().ActiveUser.User.IsAdmin)
+{
+    <div class="form center-div">
+        <h1 class="heading">For Admin <span>Authorization</span>only</h1>
+        <input @bind-value="publicKey" class="box" placeholder="enter paystacks public key">
+        <input @bind-value="secretKey" class="box" placeholder="enter paystacks secret key">
+        <button @onclick="SaveKeys" class="btn">Save</button>
+        <input @bind="projectName" class="box" type="text" placeholder="Give the project a title" />
+        <button @onclick="AddProjectName" class="btn">Add</button>
+    </div>
+
+}
+
+@code{
+    List<User> users = new();
+    string publicKey = "";
+    string secretKey = "";
+    string projectName = "";
+    string tableSizeClass = "scanty";
+    int count = 0;
+    public string FilePath { get; set; } = "./img/user-2.png";
+    protected async override Task OnInitializedAsync()
+    {
+        users = await userController.ReadAllUsers();
+        if (users.Count > 5)
+            tableSizeClass = "large";
+        store.AddStateChangedListeners(() => { StateHasChanged(); });
+    }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        count = 0;
+    }
+    public void Dispose()
+    {
+        store.RemoveStateChangedListeners(() => { StateHasChanged(); });
+    }
+    private async void GrantAcess(User user)
+    {
+        user.AllowAcess = true;
+        await userController.AddUser(user);
+    }
+    private async void AddProjectName()
+    {
+        if (projectName != "")
+        {
+            string key = JsonConvert.SerializeObject("project");
+            string value = JsonConvert.SerializeObject(projectName);
+            var isAdded = await database.Create("Project", key, value);
+            if (isAdded)
+            {
+                projectName = string.Empty;
+            }
+        }
+    }
+    private void SaveKeys()
+    {
+        var dict = new Dictionary<string, string>();
+        if (publicKey != "" && secretKey != "")
+        {
+            dict.Add("public", publicKey);
+            dict.Add("secret", secretKey);
+            productController.AddPaystackKey(dict);
+        }
+    }
+}

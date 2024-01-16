@@ -1,0 +1,73 @@
+﻿@inject IAccountController accountController
+
+<section>
+    <div>
+        <select @bind="selected" class="_input">
+            <option value="1">Fund your Wallet</option>
+            <option value="2">View Transactions</option>
+        </select>
+        @if (selected == "1")
+        {
+            <DynamicTables TableTitle="Fund Your Easy Life Wallet" SkipHeaderNames="skipWalletFundingHeader" TableItems="accountNumbers" />
+            <p class="p">
+                Kindly transfer any desired amount sufficient to make purchases
+                on this platform to the account information(s) above.
+            </p>
+            <p class="p">
+                After the transfer, send an email with your name, the transfer amount,
+                date, time and your wallet Id to peters.soft.network@gmail.com
+                for admin confirmation. Kindly use "Easy Life Wallet Funding" as subject of the
+                mail. Thanks for keeping us in business.
+            </p>
+        }
+        else if (selected == "2" && walletNotifications.Count > 0)
+        {
+            <DynamicTables TableTitle="Wallet Transactions"
+                 TableItems="walletNotifications" SkipHeaderNames="skipWalletFundingHeader"/>
+        }
+        else
+        {
+            <p class="p">No wallet history or transaction found.</p>
+        }
+    </div>
+</section>
+
+@code {
+    private string selected = "1";
+    List<string> skipWalletFundingHeader = new() { "Id","UserId","IsViewed", "Message" };
+    [Parameter]
+    public Wallet wallet { get; set; } = new();
+    List<AccountNotification> walletNotifications = new();
+    List<AccountNumber> accountNumbers = new()
+    {
+        new AccountNumber(){Account_Name = "Uche Nwuju Victor", Account_Number = "3075623338", Bank = "First Bank Plc"}
+    };
+    List<NewOrder> transactions = new() //Use this info to populate the transactions info
+    {//There users can manage their orders and transaction status
+        new NewOrder(){Id = "1", Date = DateTime.Now, PaymentChannel = "via wallet", Status = OrderStatus.Cancelled}, 
+         new NewOrder(){Id = "2", Date = DateTime.Now, PaymentChannel = "via wallet", Status = OrderStatus.Cancelled},
+          new NewOrder(){Id = "3", Date = DateTime.Now, PaymentChannel = "via wallet", Status = OrderStatus.Cancelled},
+           new NewOrder(){Id = "4", Date = DateTime.Now, PaymentChannel = "via wallet", Status = OrderStatus.Cancelled},
+            new NewOrder(){Id = "5", Date = DateTime.Now, PaymentChannel = "via wallet", Status = OrderStatus.Cancelled},
+    };
+    protected override async Task OnInitializedAsync()
+    {
+        accountNumbers = await accountController.GetAccountNumbers();
+        walletNotifications = await accountController.GetAccountNotifications(wallet.UserId);
+        AppendWalletIdToAccountNumber();
+    }
+    private void AppendWalletIdToAccountNumber()
+    {
+        if (accountNumbers.Count.Equals(1))
+        {
+            accountNumbers[0].Wallet_Id = wallet.WalletId;
+        }
+        else if (accountNumbers.Count > 1)
+        {
+            foreach (var num in accountNumbers)
+            {
+                num.Wallet_Id = wallet.WalletId;
+            }
+        }
+    }
+}

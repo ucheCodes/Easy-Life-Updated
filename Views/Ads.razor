@@ -1,0 +1,137 @@
+﻿@inject IStore store
+@inject AdsControl adsControl
+<div class="ads">
+@*    @foreach (var slide in slides)
+    {
+        <div class="slider @(slide.IsActive ?  @sliderAnimation : "")" style="background-image: url('@slide.FilePath')">
+            <div class="slide-caption text-center">
+                <div>
+                    <h3>
+                        @slide.Desc &nbsp;&nbsp; @slide.FilePath
+                        @if(slide.Link != "")
+                        {
+                           <a href="@slide.Link">Click to learn more &rarr;</a> 
+                        }
+                    </h3>
+                </div>
+            </div>
+        </div>
+    }*@
+    @if (slides.Count > 0)
+    {
+        foreach (var slide in slides)
+        {
+            <div class="slider @(slide.IsActive ? @sliderAnimation : "")">
+                <img src="@slide.FilePath" alt="@slide.Desc" />
+                <div class="slide-caption text-center">
+                    <div>
+                        <h3>
+                            @slide.Desc &nbsp;&nbsp;
+                            @if (slide.Link != "")
+                            {
+                                <a href="@slide.Link">Click to learn more &rarr;</a>
+                            }
+                        </h3>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+
+</div>
+
+@code {
+    string sliderAnimation = "zoom-in";
+    int activeIndex = 0;
+    Timer? timer;
+    [Parameter]
+    public string section { get; set; } = "";
+    List<Slides> slides = new() {
+            new Slides()
+            {
+                FilePath = "../img/commerce1.jpg",
+                Desc = "Have you patronized us?, join the winning team.",
+                Link = "/users",
+               IsActive = true
+            },
+                        new Slides()
+            {
+                FilePath = "../img/bg1.jpg",
+                Desc = "Don't be left out, join the moving train and Patronize PSN Digital E-commerce platform",
+                Link = "#",
+               IsActive = false
+            },
+
+    };
+    protected override void OnInitialized()
+    {
+        timer = new Timer(_ => NextSlide(), null, 10000, 10000);
+        if (section == "products")
+        {
+            GenerateProductAds();
+        }
+        else
+        {
+            if(adsControl.AdsList.Count > 0)
+            {
+                slides = new();
+                slides = adsControl.AdsList;
+            }
+        }
+    }
+    private void GenerateProductAds()
+    {
+        if(store.State().ProductItems.Products.Count > 0)
+        {
+            slides = new();
+            Random rnd = new();
+            Slides product = new();
+            int itemCount = 0;
+            int index = 0;
+
+            if (store.State().ProductItems.Products.Count > 10)
+                itemCount = 10;
+            else itemCount = store.State().ProductItems.Products.Count;
+            for (int i = 0; i < itemCount; i++)
+            {
+                index = rnd.Next(0, store.State().ProductItems.Products.Count-1);
+                product = new Slides()
+                    {
+                        Desc = store.State().ProductItems.Products[index].Description,
+                        FilePath = store.State().ProductItems.Products[index].Filepath,
+                        Link = $"/view/{store.State().ProductItems.Products[index].Id}",
+                        IsActive = false
+                    };
+                if (i == 0)
+                    product.IsActive = true;
+                    slides.Add(product);
+            }
+        }
+    }
+    private void setActiveSlide(int currentIndex)
+    {
+        for (int i = 0; i < slides.Count; i++)
+        {
+            if (i == currentIndex)
+            {
+                slides[i].IsActive = true;
+            }
+            else
+            {
+                slides[i].IsActive = false;
+            }
+        }
+    }
+
+    private void NextSlide()
+    {
+        activeIndex++;
+        if (activeIndex >= slides.Count)
+        {
+            activeIndex = 0;
+        }
+        setActiveSlide(activeIndex);
+        InvokeAsync(StateHasChanged);
+    }
+}

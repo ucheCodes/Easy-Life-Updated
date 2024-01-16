@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Views\Cart.razor~RF72bc44c.TMP" />
+    <None Remove="Views\Upload.razor~RF6de4436.TMP" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="7.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+    <PackageReference Include="TinyMCE.Blazor" Version="1.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HKBlog.Controllers\HKBlog.Controllers.csproj" />
+    <ProjectReference Include="..\HKBlog.Models\HKBlog.Models.csproj" />
+    <ProjectReference Include="..\HKBlog.States\HKBlog.States.csproj" />
+  </ItemGroup>
+
+</Project>

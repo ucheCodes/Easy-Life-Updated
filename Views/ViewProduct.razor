@@ -1,0 +1,98 @@
+﻿@page "/view/{id}"
+@inject IProductController productController
+@inject IStore store
+@inject AdsControl adsControl
+@implements IDisposable
+
+<div class="product">
+    <div class="special">
+        <div class="box">
+            <div class="col-2">
+                <h1>@product.Name</h1>
+                <h1>@naira @product.Price.ToString("N0")</h1>
+                <p>
+                    @product.Description
+                </p>
+                <button @onclick="(() => ShowAndAddToCart(product))" class="btn">Buy Now</button>
+            </div>
+            <div class="col-2">
+                @if (!string.IsNullOrWhiteSpace(product.Filepath))
+                {
+                    <div class="img">
+                        <img src="@product.Filepath" alt="product">
+                    </div>
+                }
+                else
+                {
+                    <img src="@Filepath" alt="product">
+                }
+            </div>
+        </div>
+    </div>
+    @if (adsControl.AdsList.Count > 0)
+    {
+        <Ads section="ads"/>
+    }
+    @if (related.Count > 0)
+    {
+        <h1>Related Products</h1>
+        <div class="related-container">
+            @foreach (var rel in related)
+            {
+                <div class="rel" @onclick="(() => ShowRelated(rel))">
+                    <div class="img">
+                        <img src="@rel.Filepath" alt="product">
+                    </div>
+                    <h3>@rel.Name</h3>
+                    <p>@naira @rel.Price.ToString("N0")</p>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code{
+    [Parameter]
+    public string Id { get; set; } = string.Empty;
+    public Product product { get; set; } = new Product();
+    public List<Product> related { get; set; } = new();
+    string Filepath = "./img/yellow.jpg";
+    char naira = (char)8358;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Id))
+        {
+            product = await productController.GetProduct(Id);
+            if (product != null && !string.IsNullOrWhiteSpace(product.Category))
+            {
+                var all = await productController.GetProducts();
+
+                related = (all.Where(p => p.Category == product.Category)).ToList();
+            }
+        }
+
+        store.AddStateChangedListeners(() => { StateHasChanged(); });
+    }
+    private void ShowAndAddToCart(Product product)
+    {
+        if (string.IsNullOrEmpty(store.State().ActiveUser.User.Id))
+        {
+            store.LoginClick(false, true);
+        }
+        else
+        {
+            store.AddToCart(product);
+            store.ShowCart(true);
+        }
+    }
+    private void ShowRelated(Product rel)
+    {
+        product = rel;
+    }
+    public void Dispose()
+    {
+        store.RemoveStateChangedListeners(() => { StateHasChanged(); });
+    }
+}

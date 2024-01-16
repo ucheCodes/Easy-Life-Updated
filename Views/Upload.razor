@@ -1,0 +1,238 @@
+﻿@inject IUserController userController
+@inject IProductController productController
+@inject IStore store
+@inject AdsControl adsControl
+@implements IDisposable
+
+
+@if (errors.Count > 0)
+{
+    <h2>errors</h2>
+    <ul>
+        @foreach (var error in errors)
+        {
+            <li class="error">@error</li>
+        }
+    </ul>
+}
+<select class="box" @bind="selected">
+    <option value="0">Select</option>
+    <option value="1">Upload Product</option>
+    <option value="2">Upload Ads</option>
+</select>
+<em class="error">@message</em>
+@switch (selected)
+{
+    case 1:
+        <div>
+            <h3>Upload Product</h3>
+            <input maxlength="40" @bind="newCategory" type="text" placeholder="Add a new category" class="box" />
+            <button type="button" @onclick="AddNewCategory" class="btn">Add</button>
+        </div>
+
+        <EditForm Model="store.State().ProductVal.ProductVal" OnValidSubmit="AddProduct">
+            <DataAnnotationsValidator></DataAnnotationsValidator>
+            <ValidationSummary class="error"></ValidationSummary>
+            <div>
+                <div>
+                    <select class="box" @bind="store.State().ProductVal.ProductVal.Category">
+                        @if (Categories.Count > 0)
+                        {
+                            foreach (var item in Categories)
+                            {
+                                <option value="@item">@item</option>
+                            }
+                        }
+                    </select>
+                    <InputText maxlength="30" @bind-Value="store.State().ProductVal.ProductVal.Name" type="text" placeholder="Enter product Name" class="box" />
+                    <InputTextArea maxlength="150" @bind-Value="store.State().ProductVal.ProductVal.Description" placeholder="Enter a descriptive text to impress customers" class="box" />
+                    <InputNumber @bind-Value="store.State().ProductVal.ProductVal.Price" placeholder="Product price" class="box" />
+                </div>
+                <div class="file">
+                    <InputFile type="file" class="custom-file-input" OnChange="@LoadFile" accept=".png,.jpg,.jpeg" />
+                    @if (!string.IsNullOrEmpty(store.State().ProductVal.ProductVal.Filepath))
+                    {
+                        <img src="@store.State().ProductVal.ProductVal.Filepath" alt="default">
+                    }
+                </div>
+            </div>
+            <button type="submit" class="btn">Submit</button>
+        </EditForm>
+        break;
+    case 2:
+        <EditForm Model="ads" OnValidSubmit="AddAds">
+            <DataAnnotationsValidator></DataAnnotationsValidator>
+            <ValidationSummary class="error"></ValidationSummary>
+            <div>
+                <div>
+                    <InputText maxlength="140" @bind-Value="ads.Link" type="text" placeholder="Enter Ads navigation link" class="box" />
+                    <InputTextArea maxlength="150" @bind-Value="ads.Desc" placeholder="Enter ads descriptive text" class="box" />
+                </div>
+                <div class="file">
+                    <InputFile type="file" class="custom-file-input" OnChange="@LoadFile" accept=".png,.jpg,.jpeg" />
+                    @if (!string.IsNullOrEmpty(ads.FilePath))
+                    {
+                        <img src="@ads.FilePath" alt="default">
+                    }
+                </div>
+            </div>
+            <button type="submit" class="btn">Submit</button>
+        </EditForm>
+        break;
+    default:
+        break;
+}
+
+@code {
+    private string newCategory { get; set; } = "";
+    Product product = new();
+    Slides ads = new();
+    List<Product> products = new();
+    public List<string> Categories { get; set; } = new();
+    int selected = 1;
+    string message = "";
+    protected override async Task OnInitializedAsync()
+    {
+        Categories = await productController.GetCategories();
+        if (Categories.Count > 0)
+        {
+            store.State().ProductVal.ProductVal.Category = Categories[0];//faulty state variable
+        }
+        store.AddStateChangedListeners(() => { StateHasChanged(); });
+    }
+    protected async override Task OnAfterRenderAsync(bool firstRender)
+    {
+        products = await productController.GetProducts();
+    }
+    public void Dispose()
+    {
+        store.RemoveStateChangedListeners(() => { StateHasChanged(); });
+    }
+    public void AddAds()
+    {
+        if (ads.FilePath != "" && ads.Desc != "")
+        {
+            ads.Id = Guid.NewGuid().ToString();
+            ads.Date = DateTime.Now;
+            var isAdded = adsControl.AddAds(ads);
+            if(isAdded.Result)
+                store.ShowUpload(false);
+                message = "";
+                ads = new();
+        }
+        else
+        {
+            message = "ads image and description must not be empty";
+        }
+    }
+    private async void AddProduct()
+    {
+        if (!string.IsNullOrEmpty(store.State().ProductVal.ProductVal.Filepath) && store.State().ProductVal.ProductVal.Price > 0)
+        {
+            @if (string.IsNullOrEmpty(store.State().ProductVal.ProductVal.Id))
+            {
+                store.State().ProductVal.ProductVal.Id = Guid.NewGuid().ToString();
+            }
+
+            store.State().ProductVal.ProductVal.Date = DateTime.Now;
+            store.State().ProductVal.ProductVal.Quantity = 1;
+            store.State().ProductVal.ProductVal.Price = ComputeTax(store.State().ProductVal.ProductVal.Price);
+            product = store.State().ProductVal.ProductVal;
+            var isAdded = await productController.AddProduct(product);
+            if (isAdded)
+            {
+                store.ShowUpload(false);
+                store.ChangeProductVal(new());///store.State().ProductItems.Products
+                var isExist = products.Any(p => p.Id == product.Id);
+                if (isExist)
+                {
+                    products = products.Where(p => p.Id != product.Id).ToList();
+                }
+                products.Add(product);
+                products = (products.OrderByDescending(p => p.Date)).ToList<Product>();
+                store.UpdateProducts(products);
+                message = string.Empty;
+            }
+        }
+        else
+        {
+            message = "product must have an image and a price greater than 0";
+        }
+    }
+    private double ComputeTax(double initialPrice)
+    {
+        double tax = ((0.05 * initialPrice) + 200);//5% + 200 per unit
+        return (tax + initialPrice);
+    }
+    private async void AddNewCategory()
+    {
+        if (!string.IsNullOrEmpty(newCategory.ToLower()) && !Categories.Contains(newCategory.ToLower()))
+        {
+            var isAdded = await productController.AddCategory(newCategory.ToLower());
+            if (isAdded)
+            {
+                Categories.Add(newCategory.ToLower());
+                newCategory = string.Empty;
+            }
+        }
+    }
+
+    //File upload management
+    [Inject]
+    private IWebHostEnvironment? _environment { get; set; }
+    private long maxFileSize = 1024 * 1024 * 5;//reps 5MB
+                                               //private int maxAllowedFiles = 3;
+    private List<string> errors = new();
+    private IBrowserFile? file;
+
+    private async void LoadFile(InputFileChangeEventArgs e)
+    {
+        file = e.File;
+        string relativePath = await CaptureFile();
+        if (selected == 1)
+        {
+            store.State().ProductVal.ProductVal.Filepath = relativePath;
+        }
+        else
+        {
+            ads.FilePath = relativePath;
+        }
+        message = "";
+    }
+    private async Task<string> CaptureFile()
+    {
+        if (file == null)
+        {
+            return "";
+        }
+        string path = "";
+        try
+        {
+            if (_environment != null)
+            {
+                var uploadPath = Path.Combine(_environment.WebRootPath, "Upload");
+                if (!Directory.Exists(uploadPath))
+                {
+                    Directory.CreateDirectory(uploadPath);
+                }
+                string newFilename = Path.ChangeExtension(Path.GetRandomFileName(), Path.GetExtension(file.Name));
+                path = Path.Combine(uploadPath, newFilename);
+
+                string fileExtension = Path.GetExtension(file.Name);
+                string relativePath = Path.Combine("Upload", newFilename);
+                await using FileStream fs = new(path, FileMode.Create);
+                await file.OpenReadStream(maxFileSize).CopyToAsync(fs);
+                //this.FilePath = Path.Combine("./", relativePath);
+                return Path.Combine("./", relativePath);
+            }
+            return "";
+
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"File : {file.Name} Error : {ex.Message}");
+            throw;
+        }
+
+    }
+}

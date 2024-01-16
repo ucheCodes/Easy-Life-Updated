@@ -1,0 +1,300 @@
+﻿@page "/account"
+@inject IStore store
+@inject IOrderController orderController
+@inject IAccountController accountController
+@inject IEncryptionHelper encryptionHelper
+
+<section class="account">
+    <h1 class="heading">User <span>Account</span></h1>
+    @if (string.IsNullOrEmpty(store.State().ActiveUser.User.Id))
+    {
+        <div @onclick="LogNewUser" class="info">
+            <div class="flex-col">
+                <h3>User Name</h3>
+                <h3>080xxxyyyzz</h3>
+                <h3>abc@xyz.net</h3>
+            </div>
+            <div class="flex-col">
+                <img src="./img/user-2.png" />
+                <em class="error">user name</em>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="info">
+            <div class="flex-col">
+                <h3><i class="fas fa-user"></i> @store.State().ActiveUser.User.Username</h3>
+                <h3><i class="fas fa-phone"></i> @store.State().ActiveUser.User.Mobile</h3>
+                <h3><i class="fas fa-envelope"></i> @store.State().ActiveUser.User.Email</h3>
+                <h3><i class="fas fa-map-marker-alt"></i> @store.State().ActiveUser.User.Center</h3>
+                <h3 class="error" @onclick="EditAccount"><i class="fas fa-edit"></i> Edit account Info</h3>
+            </div>
+            <div class="flex-col">
+                @if (string.IsNullOrEmpty(store.State().ActiveUser.User.Filepath))
+                {
+                    <img src="./img/user-2.png" />
+                }
+                else
+                {
+                   <img src="@store.State().ActiveUser.User.Filepath" />
+                }
+                <em class="online">online</em>
+            </div>
+        </div>
+    }
+    <div class="box-container">
+        <div @onclick="EnableWallet" class="box">
+            <h3>Wallet <i class="fas fa-wallet"></i></h3>
+            <h3>@naira @userWallet.Balance</h3>
+            @if (userWallet.UserId != "")
+            {
+                <strong>Wallet Id: @userWallet.WalletId</strong>
+            }
+        </div>
+        <div @onclick="ViewOrders" class="box">
+            <h3>Orders <i class="fas fa-shopping-bag"></i></h3>
+            <h3>@newOrdersCount</h3>
+        </div>
+        <div @onclick="(() => {selected = 3;})" class="box">
+            <h3>Deliveries <i class="fas fa-truck"></i></h3>
+            <h3>@approved.Count</h3>
+        </div>
+        <div @onclick="(ViewNotifications)" class="box">
+            <h3>Notifications <i class="far fa-bell"></i></h3>
+            <h3>@notificationsCount</h3>
+        </div>
+@*        <div @onclick="(() => {selected = 4;})" class="box">
+            <h3>Transactions <i class="far fa-credit-card"></i></h3>
+            <h3>@pt.Count</h3>
+        </div>*@
+    </div>
+    @switch (selected)
+    {
+        case 1:
+        if (userWallet.UserId != "")
+            {
+                <WalletView wallet="userWallet"/>
+            }
+            else
+            {
+                <p class="p">Kindly login to enable Wallet</p>
+            }
+        break;
+        case 2:
+            if(newOrders.Count > 0)
+            {
+                <NewOrderTable orders="newOrders"  TableTitle="Orders" />
+                @*<DynamicTables TableItems="newOrders" InitializeSortByTime="true" TableTitle="Orders" />*@
+                @*<OrderTable orders="orders" TableTitle="Ordered Products" />*@
+            }
+            else
+            {
+                <p class="p">You have made no order on this platform</p>
+            }
+            break;
+        case 3:
+            if (approved.Count > 0)
+            {
+                <NewOrderTable orders="approved" TableTitle="Delivered Products" />
+            }
+            else
+            {
+                <p class="p">No approved deliveries</p>
+            }
+            break;
+        case 4:
+            if (notifications.Count > 0)
+            {
+                <section class="dynamic-table">
+                    <div class="table-header">
+                        <h1 class="heading">Notifications</h1>
+                    </div>
+                    <div class="scanty">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>S/N</th>
+                                    <th>Message</th>
+                                    <th>Transaction Id</th>
+                                    <th>Date</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var n in notifications)
+                                {
+                                    <tr>
+                                        <td>@count</td>
+                                        <td>@n.Message</td>
+                                        <td>@n.PaymentId</td>
+                                        <td>@n.Date.ToString("ddd, dd MMM yyyy")</td>
+                                        <td>@n.Date.ToString("hh : mm tt")</td>
+                                    </tr>
+                                    count++;
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                @*<DynamicTables TableItems="pt" InitializeSortByTime="true" TableTitle="Payment Details" />*@
+            }
+            else
+            {
+                <p class="p"> No notifications</p>
+            }
+            break;
+        default:
+            <p></p>
+        break;
+    }
+    <Ads section="products"/>
+</section>
+
+@code {
+    char naira = (char)8358;
+    int selected = 2;
+    int count = 1;
+    int newOrdersCount = 0;
+    int notificationsCount = 0;
+    Wallet userWallet = new();
+    List<Wallet> allWallets = new();
+    List<AccountNumber> accountNumbers = new();
+    List<AccountNotification> notifications = new();
+
+    List<NewOrder> newOrders = new();
+    List<NewOrder> pending = new();
+    List<NewOrder> approved = new();
+    List<NewOrder> cancelled = new();
+
+    List<Orders> orders = new();
+    List<PaystackTransaction> pt = new();
+    List<Orders> delivered = new();
+    List<string> IgnoreOrderHeader = new List<string>() { "AuthorizationUrl","Products", "IsValid" };
+    //protected override async Task  OnInitializedAsync()
+    //{
+    //    orders = (await orderController.GetAllOrders()).Where(d => d.Email.ToLower().Equals(store.State().ActiveUser.User.Email.ToLower())).ToList();
+    //    var allPt = await orderController.GetAllPaystackTransaction();
+    //    delivered = orders.Where(d => d.IsDelivered).ToList();
+    //    pt = allPt.Where(p => p.Email.ToLower().Equals(store.State().ActiveUser.User.Email.ToLower())).ToList();
+    //    store.AddStateChangedListeners(() => { StateHasChanged(); });
+    //}
+    protected override async Task OnInitializedAsync()
+    {
+        newOrders = (await orderController.GetAllNewOrdersForEasyLifeUpdate()).Where(d => d.UserId.Equals(store.State().ActiveUser.User.Id)).OrderByDescending(x => x.Date).ToList();
+        notifications = (await accountController.GetAccountNotifications(store.State().ActiveUser.User.Id)).OrderByDescending(n => n.Date).ToList();
+        approved = newOrders.Where(x => x.Status.Equals(OrderStatus.Approved)).ToList();
+        newOrdersCount = newOrders.Where(x => x.IsViewed.Equals(false)).ToList().Count;
+        notificationsCount = notifications.Where(n => !n.IsViewed).Count();
+        GetWalletData();
+        store.AddStateChangedListeners(() => { StateHasChanged(); });
+    }
+    private void EditAccount()
+    {
+        store.State().ActiveUser.User.IsEditAccount = true;
+        store.LoginClick(true, false);
+    }
+    private void LogNewUser()
+    {
+        store.LoginClick(true, false);
+    }
+    private void EnableWallet()
+    {
+        if (string.IsNullOrEmpty(store.State().ActiveUser.User.Id))
+        {
+            store.LoginClick(false, true);
+        }
+        else
+        {
+            bool EncWalletExists = (accountController.EncryptedDataExists(store.State().ActiveUser.User.Id)).Result;
+            if (userWallet.UserId == "" && !EncWalletExists)
+            {
+                int walletCount = accountController.GetEncryptedDataCount();
+                int code = walletCount + 1801;
+                Wallet w = new Wallet()
+                    {
+                        Balance = 0,
+                        UserId = store.State().ActiveUser.User.Id,
+                        WalletId = $"EL{code}",
+                        EncryptionId = store.State().ActiveUser.User.Id,
+                    };
+                string serializedData = JsonConvert.SerializeObject(w);
+                var isCreated = accountController.EncryptData(serializedData, w.EncryptionId, DataFrom.wallet);
+                if (isCreated.Result)
+                {
+                    userWallet = w;
+                }
+            }
+            else if (userWallet.UserId == "" && EncWalletExists)
+            {
+                GetWalletData();
+            }
+            selected = 1;
+        }
+    }
+    private void ViewOrders()
+    {
+        selected = 2;
+        var isAllNewOrdersViewed = newOrders.All(x => x.IsViewed);
+        if (!isAllNewOrdersViewed)
+        {
+            foreach (var ord in newOrders)
+            {
+                if (!ord.IsViewed)
+                {
+                    ord.IsViewed = true;
+                    var isAdded = orderController.AddNewOrderForEasyLifeUpdate(ord);
+                }
+            }
+            newOrdersCount = 0;
+        }
+    }
+    private void ViewNotifications()
+    {
+        selected = 4;
+        var isAllNotifViewed = notifications.All(x => x.IsViewed);
+        if (!isAllNotifViewed)
+        {
+            foreach (var n in notifications)
+            {
+                if (!n.IsViewed)
+                {
+                    n.IsViewed = true;
+                    var isAdded = accountController.CreateAccountNotification(n);
+                }
+            }
+            notificationsCount = 0;
+        }
+    }
+    private string GenerateWalletId()
+    {
+        //Because of the recursiveness of a while loop, I choose not to use this code
+        //List<EncryptionKeeper> getWallets = accountController.GetAllEncryptedData(DataFrom.wallet).Result;
+        List<Wallet> getWallets = new();
+        bool isNumberGenerated = true;//set initial to true
+        Random rnd = new Random();
+        int number = 0;
+        while (isNumberGenerated)
+        {
+            number = rnd.Next(1000, 9999);
+            isNumberGenerated = getWallets.Any(x => x.WalletId.Equals(number.ToString()));
+        }
+        return number.ToString();
+    }
+    private async void GetWalletData()
+    {
+        if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id))
+        {
+            EncryptionKeeper encWalletData = await accountController.GetEncryptedData(store.State().ActiveUser.User.Id);
+            if (!string.IsNullOrEmpty(encWalletData.EncryptedSerializedData) && encWalletData.DataFrom.Equals(DataFrom.wallet))
+            {
+                string serializedWalletData = encryptionHelper.Decrypt(encWalletData.EncryptedSerializedData, encWalletData.EncryptionKey, encWalletData.EncryptionIV);
+                userWallet = JsonConvert.DeserializeObject<Wallet>(serializedWalletData) ?? new();
+            }
+        }
+    }
+    public void Dispose()
+    {
+        store.RemoveStateChangedListeners(() => { StateHasChanged(); });
+    }
+}

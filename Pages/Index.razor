@@ -1,0 +1,61 @@
+﻿@page "/"
+@inject NavigationManager navManager
+@inject IEncryptionHelper encHelper
+@inject IStore store
+@implements IDisposable
+
+<ProductView/>
+
+@code {
+    protected override void OnInitialized()
+    {
+        store.AddStateChangedListeners(() => { StateHasChanged(); });
+    }
+
+    public void Dispose()
+    {
+        store.RemoveStateChangedListeners(() => { StateHasChanged(); });
+    }
+
+     /*
+     * On adds clicked, track and keep record
+     *This is an updated version of digicart's codes to facilitate
+     *Launching of easy life in Jan 2024
+     *On upload page, add a section where admin can add section.
+     *Review the Buy Now code, users should pay on delivery and via wallet so that I
+     *can use my teeth to count my tongue
+     *all orders pending, delivered or cancelled should show on the 
+     *users dashbord with admin dashboard
+     *on-campus vendor should have a note to tick all orders whether paid or rejected
+     *users should be able to cancel their orders before delivery
+     /*Show students number of supplier / Link to whatsapp chat*/
+
+     //Scope of work  for update
+     //On the cart UI, give users a drop down to select whether to pay via wallet
+     //Or via Pay on Delivery. On the order update code on the Cart component,
+     //Let the means of payment be recorded to the db as well as delivery status
+     //If users are not wallet account enabled in state management, that option 
+     //should not be available.
+     //If wallet is enabled and their fund is less than what is in the cart,
+     //the buy now button should be disabled button should and probably leave an
+     //error message
+
+     //Work on incorporating this changes on the UI and state management
+     //Add a notification tab that will update users of their progress, order and payments
+     //on the system
+     //When crediting and debiting users wallet, send them email notifications and keep
+     //a notification tab
+     //}*/
+
+     /*
+      * //Confirmed use of encryption codes
+        var encrypted = encHelper.Encrypt("Hello World");
+       string data = encrypted.encryptedResult;
+       byte[] key = encrypted.key;
+       byte[] iv = encrypted.IV;
+       string decrypted = encHelper.Decrypt(data, key, iv);
+    */
+}
+
+
+

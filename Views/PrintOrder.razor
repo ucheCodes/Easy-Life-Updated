@@ -1,0 +1,119 @@
+﻿@page "/print"
+@inject NavigationManager navigationManager
+@inject IOrderController oc
+@inject IJSRuntime jsRuntime
+
+<section class="dynamic-table">
+    <div class="table-header">
+        <h1 class="heading">Print Orders</h1>
+    </div>
+    <div class="center-btn">
+        <select class="select" @onchange="Select">
+            <option value="1">Print All</option>
+            <option value="2">Print Selected</option>
+        </select>
+    </div>
+    <div class="table @tableSizeClass">
+        <div class="table-body">
+            <table>
+                <thead>
+                    <tr>
+                        <th>S/N</th>
+                        <th>Reference</th>
+                        <th>Access Code</th>
+                        <th>Email</th>
+                        <th>Mobile</th>
+                        <th>Date</th>
+                        <th>View Products</th>
+                        <th>Select Order</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ord in orders)
+                    {
+                        <tr>
+                            <td>@count</td>
+                            <td>@ord.Reference</td>
+                            <td>@ord.AccessCode</td>
+                            <td>@ord.Email</td>
+                            <td>@ord.Mobile</td>
+                            <td>@ord.Date.ToString("ddd, dd MM yyyy")</td>
+                            <td @onclick="(() => View(ord.Reference))" class="icon"><i class="fas fa-eye"></i></td>
+                            <td><input type="checkbox" @onchange="(() => AddToDeliveryList(ord))"/></td>
+                        </tr>
+                        count++;
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="center-btn">
+        <button class="btn" @onclick="Print">Print</button>
+    </div>
+</section>
+
+@code {
+    int count = 0;
+    string tableSizeClass = "scanty";
+    private bool isChecked;
+    private List<Orders> deliveryList = new();
+    public List<Orders> orders { get; set; } = new();
+    public List<Orders> _orders { get; set; } = new();
+    protected override async Task OnInitializedAsync()
+    {
+        _orders = (await oc.GetAllOrders()).Where(x => !x.IsDelivered).OrderByDescending(o => o.Date).ToList();
+        orders = _orders;
+        if (orders.Count > 4)
+            tableSizeClass = "large";
+    }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        count = 0;
+    }
+    private void AddToDeliveryList(Orders order)
+    {
+        isChecked = deliveryList.Any(d => d.Reference.Equals(order.Reference));
+        if (isChecked)
+        {
+            deliveryList.Remove(order);
+        }
+        else
+        {
+            deliveryList.Add(order);
+        }
+    }
+    private void View(string id)
+    {
+        navigationManager.NavigateTo($"/order-products/{id}");
+    }
+    private void Select(ChangeEventArgs e)
+    {
+        string value = e.Value?.ToString() ?? "";
+        switch (value)
+        {
+            case "1":
+                orders = _orders;
+                break;
+            case "2":
+                orders = deliveryList;
+                break;
+            default:
+                orders = _orders;
+                break;
+        }
+        if (orders.Count > 4)
+            tableSizeClass = "large";
+        else
+            tableSizeClass = "scanty";
+    }
+    private async void Print()
+    {
+        if (deliveryList.Count > 0)
+        {
+            orders = deliveryList;
+        }
+        //await jsRuntime.InvokeVoidAsync("printTable");//alternative
+        var jsCode = "window.print()";
+        await jsRuntime.InvokeVoidAsync("eval", jsCode);
+    }
+}

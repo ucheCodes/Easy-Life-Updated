@@ -1,0 +1,31 @@
+﻿@inherits LayoutComponentBase
+@inject IDatabase database
+
+<PageTitle>@projectName</PageTitle>
+
+<div>
+    <NavMenu />
+    <main>
+        <article>
+            @Body
+        </article>
+    </main>
+    <Footer/>
+</div>
+
+@code{
+    string projectName = "Shop Now";
+    protected override void OnInitialized()
+    {
+        GetProjectName();
+    }
+    private async void GetProjectName()
+    {
+        string key = JsonConvert.SerializeObject("project");
+        var data = await database.Read("Project", key);
+        if (!string.IsNullOrEmpty(data.Value))
+        {
+            projectName = JsonConvert.DeserializeObject<string>(data.Value) ?? "Shop Now";
+        }
+    }
+}

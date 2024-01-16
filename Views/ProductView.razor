@@ -1,0 +1,239 @@
+﻿@inject IProductController productController
+@inject IStore store
+@inject NavigationManager navigationManager
+@implements IDisposable
+
+@if (store.State().ProductItems.Products.Count == 0)
+{
+    <ProductDemo/>
+}
+else
+{
+    <section class="product">
+        <ProductBanner />
+        <h1 class="heading">All <span>Products : @store.State().ProductItems.Products.Count</span></h1>
+        <div class="scroller-btns">
+            <span @onclick="(() => GetCategoryProducts(all))" class="@GetActiveClass(all)">All</span>
+            <span @onclick="(() => GetCategoryProducts(latest))" class="@GetActiveClass(latest)">Latest</span>
+            @foreach (var cat in categories)
+            {
+@*                <span @onclick="@(() => ToggleActiveClass(cat))" class="@GetActiveClass(cat)">@cat</span>*@
+                <span @onclick="(() => GetCategoryProducts(cat))" class="@GetActiveClass(cat)">@cat</span>
+            }
+        </div>
+
+
+        @for(int m = 1; m < 5; m++)
+        {
+            if (m < 4)
+                range = increment * m;
+            else
+                range = store.State().ProductItems.Products.Count;
+            productAfterAdsCount = 0;
+            <div class="box-container">
+                @for (var i = productIndex; i < store.State().ProductItems.Products.Count; i++)//foreach(var product in store.State().ProductItems.Products)
+                {
+                    if (i == range) break;
+                    var product = store.State().ProductItems.Products[i];
+                    <div class="box">
+                        @if (!string.IsNullOrWhiteSpace(product.Filepath))
+                        {
+@*                            <div>
+                                <small>@product.Date.ToString("ddd, dd MMM yyyy")</small>
+                                <small>@product.Date.ToString("hh : mm tt")</small>
+                            </div>*@
+                            <div @onclick="(() => View(product.Id))" class="img">
+                                <img loading="lazy" src="@product.Filepath" alt="product">
+                            </div>
+                            <div class="icons">
+                                @if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id) && store.State().ActiveUser.User.AllowAcess)
+                                {
+                                    <i @onclick="(() => {showDel =! showDel; deleteId = product.Id;})" class="fas fa-trash"></i>
+                                    <i @onclick="(() => EditProduct(product))" class="fa-solid fa-pen-to-square"></i>
+                                    @if (showDel && product.Id == deleteId)
+                                    {
+                                        <span>Confirm <i @onclick="(() => DeleteProduct(product.Id))" class="fas fa-trash"></i></span>
+                                    }
+                                }
+                            </div>
+                            <h3>
+                                @product.Name &nbsp;&nbsp;
+                                <i @onclick="(() =>AddToCart(product))" class="fas fa-shopping-cart"></i>
+                            </h3>
+                            <p>@naira @product.Price.ToString("N0")</p>
+                            <button @onclick="(() =>ShowAndAddToCart(product))" class="btn">Buy Now</button>
+                        }
+                    </div>
+                    productAfterAdsCount++;
+                    productIndex++;
+                }
+            </div>
+            if (productAfterAdsCount >= 3)
+            {
+                switch (m)
+                {
+                    case 1:
+                        <Ads section="products" />
+                        break;
+                    case 2:
+                        <Counter />
+                        break;
+                    case 3:
+                        <Ads />
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+    </section>
+}
+
+@code{
+    List<Product> products = new();
+    bool showDel = false;
+    string deleteId = "";
+    Product special = new();
+    List<string> categories = new();
+    char naira = (char)8358;
+    string all = "all"; 
+    string latest = "latest";
+    private string activeCategory = "all";
+    int increment = 0;
+    int productIndex = 0;
+    int range = 0;
+    int productAfterAdsCount = 0;
+    [Inject]
+    private IWebHostEnvironment? _environment { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await productController.GetProducts();
+        if (products.Count > 0)
+        {
+            products = (products.OrderByDescending(p => p.Date)).ToList<Product>();
+            store.UpdateProducts(products);
+        }
+
+        InitializeIncrement();
+        categories = await productController.GetCategories();
+        store.AddStateChangedListeners(() => { StateHasChanged(); });
+    }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        productIndex = 0;
+    }
+    private void InitializeIncrement()
+    {
+        if (store.State().ProductItems.Products.Count < 6)
+        {
+            increment = store.State().ProductItems.Products.Count;
+        }
+        else if (store.State().ProductItems.Products.Count >= 6)
+        {
+            increment = 6;
+        }
+        else if (store.State().ProductItems.Products.Count >= 36)
+        {
+            increment = 12;
+        }
+    }
+    private void ToggleActiveClass(string clickedCategory)
+    {
+        if (clickedCategory == activeCategory)
+        {
+            activeCategory = "";
+        }
+        else
+        {
+            activeCategory = clickedCategory;
+        }
+    }
+
+    private string GetActiveClass(string category)
+    {
+        return category == activeCategory ? "active" : "";
+    }
+    private void GetCategoryProducts(string cat)
+    {
+        var _products = new List<Product>();
+        if (cat == "latest")
+        {
+            _products = (products.Where(p => DateTime.Now.Subtract(p.Date).TotalDays <= 7)).ToList<Product>();
+        }
+        else
+        {
+            _products = (products.Where(p => p.Category == cat)).ToList<Product>();
+        }
+
+        if (_products.Count > 0)
+        {
+            store.UpdateProducts(_products);
+        }
+        else
+        {
+            store.UpdateProducts(products);
+        }
+        ToggleActiveClass(cat);
+    }
+
+    private void View(string id)
+    {
+        navigationManager.NavigateTo($"/view/{id}");
+    }
+    private async void DeleteProduct(string id)
+    {
+        var isDel = await productController.DeleteProduct(id);
+        if (isDel)
+        {
+            var prd = products.FirstOrDefault(p => p.Id == id);
+            if (prd != null && prd.Id != "")
+            {
+                DeleteImage(prd.Filepath);
+                products = (products.Where(p => p.Id != prd.Id).OrderByDescending(p => p.Date)).ToList<Product>();
+                store.UpdateProducts(products);
+
+            }
+            showDel = !showDel;
+        }
+    }
+    public void DeleteImage(string filePath)
+    {
+        if (_environment != null)
+        {
+            string imagePath = Path.Combine(_environment.WebRootPath, filePath);
+
+            if (File.Exists(imagePath))
+            {
+                File.Delete(imagePath);
+            }
+        }
+    }
+    private void ShowAndAddToCart(Product product)
+    {
+        if (string.IsNullOrEmpty(store.State().ActiveUser.User.Id))
+        {
+            store.LoginClick(false,true);
+        }
+        else
+        {
+            store.AddToCart(product);
+            store.ShowCart(true);
+        }
+    }
+    private void AddToCart(Product product)
+    {
+        store.AddToCart(product);
+    }
+    private void EditProduct(Product product)
+    {
+        store.ChangeProductVal(product);
+        store.ShowUpload(true);
+    }
+
+    public void Dispose()
+    {
+        store.RemoveStateChangedListeners(() => { StateHasChanged(); });
+    }
+}

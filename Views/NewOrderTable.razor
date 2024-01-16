@@ -1,0 +1,258 @@
+﻿@inject NavigationManager navigationManager
+@inject IOrderController orderController
+@inject IUserController userController
+@inject IStore store
+
+<section class="dynamic-table">
+    <div class="table-header">
+        <h1 class="heading">@TableTitle</h1>
+    </div>
+    @if (viewTable == "orders")
+    {
+        <select @onchange="QueryAllOrders" class="select-center">
+            <option value="all">All Orders</option>
+            <option value="descending">Dates Descending</option>
+            <option value="wallet">Payments via wallet only</option>
+            <option value="paystack">Payments via Card only</option>
+            <option value="pending">Pending Orders</option>
+            <option value="approved">Approved Orders</option>
+            <option value="cancelled">Cancelled Orders</option>
+        </select>
+    }
+    <div class="table @tableSizeClass">
+        <div class="table-body">
+            <table>
+                 @if (viewTable == "products")
+                {
+                    <thead>
+                        <tr>
+                            <th>S/N</th>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Quantity</th>
+                            <th>Total</th>
+                            <th>Image</th>
+                            <th>View Orders</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in selectedProducts)
+                        {
+                            <tr>
+                                <td>@count</td>
+                                <td>@p.Name</td>
+                                <td>@naira@p.Price.ToString("N0")</td>
+                                <td>@p.Quantity</td>
+                                <td>@naira@(
+                            p.Price * p.Quantity
+                            )</td>
+                                <td><img class="table-img" src="@p.Filepath" alt="@p.Name" /></td>
+                                <td @onclick="(() => {viewTable = orderString;tableSizeClass = largeString; })"><button class="icon">Back &larr;</button></td>
+                            </tr>
+                            count++;
+                        }
+                    </tbody>
+                }
+                else if (viewTable == "orders")
+                {
+                    <thead>
+                        <tr>
+                            <th>S/N</th>
+                            <th>Payment Id</th>
+                            <th>Payment Channel</th>
+                            <th>Price</th>
+                            <th>Status</th>
+                            <th>View Products</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Payment Status</th>
+                            @if (store.State().ActiveUser.User.IsAdmin && IsAdminAuthorized)
+                            {
+                                <th>View User</th>
+                            }
+                            <th>Modify</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var ord in activeOrders)
+                        {
+                            <tr>
+                                <td>@count</td>
+                                <td>@ord.PaymentId</td>
+                                <td>@ord.PaymentChannel</td>
+                                <td>@naira @ord.Price</td>
+                                @if (ord.Status.Equals(OrderStatus.Pending))
+                                {
+                                    <td class="yellow">
+                                        @ord.Status
+                                    </td>
+                                }
+                                else if (ord.Status.Equals(OrderStatus.Cancelled))
+                                {
+                                    <td class="error">@ord.Status</td>
+                                }
+                                else if (ord.Status.Equals(OrderStatus.Approved))
+                                {
+                                    <td class="log">@ord.Status</td>
+                                }
+                                <td @onclick="(() => View(ord.Products))" class="icon"><i class="fas fa-eye"></i></td>
+                                <td>@ord.Date.ToString("ddd, dd MMM yyyy")</td>
+                                <td>@ord.Date.ToString("hh : mm tt")</td>
+                                @if (ord.PaymentStatus.Equals(PaymentStatus.Paid))
+                                {
+                                    <td class="log">@ord.PaymentStatus</td>
+                                }
+                                else if (ord.PaymentStatus.Equals(PaymentStatus.Not_Paid))
+                                {
+                                    <td class="error">@ord.PaymentStatus</td>
+                                }
+                                else
+                                {
+                                    <td class="yellow">@ord.PaymentStatus</td>
+                                }
+                                @if (store.State().ActiveUser.User.IsAdmin && IsAdminAuthorized)
+                                {
+                                    <td class="icon" @onclick="(() => ViewUser(ord.UserId))"><i class="fas fa-user"></i></td>
+                                }
+                                @if (ord.Status.Equals(OrderStatus.Pending) && IsAdminAuthorized && store.State().ActiveUser.User.IsAdmin)
+                                {
+                                    <td @onclick="(() => ModifyOrder(ord))" class="log cursor-pointer">Approve Order</td>
+                                }
+                                else if (ord.Status.Equals(OrderStatus.Approved) && IsAdminAuthorized && store.State().ActiveUser.User.IsAdmin)
+                                {
+                                    <td @onclick="(() => ModifyOrder(ord))" class="yellow cursor-pointer">Nullify Order</td>
+                                }
+                                else if (ord.Status.Equals(OrderStatus.Pending) && !IsAdminAuthorized)
+                                {
+                                    <td @onclick="(() => ModifyOrder(ord))" class="error cursor-pointer">Cancel Order</td>
+                                }
+                                else if (ord.Status.Equals(OrderStatus.Cancelled) && !IsAdminAuthorized)
+                                {
+                                    <td @onclick="(() => ModifyOrder(ord))" class="log cursor-pointer">Re-Validate</td>
+                                }
+                            </tr>
+                            count++;
+                        }
+                    </tbody>
+                }
+                else if (viewTable == "user")
+                {
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Mobile</th>
+                            <th>Image</th>
+                            <th>Back</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                            <tr>
+                                <td>@user.Username</td>
+                                <td>@user.Email</td>
+                                <td>@user.Mobile</td>
+                                <td><img class="table-img" src="@user.Filepath" alt="No img" /></td>
+                            <td @onclick="(() => {viewTable = orderString;tableSizeClass = largeString; })"><button class="icon">Back &larr;</button></td>
+                            </tr>
+                    </tbody>
+                }
+            </table>
+        </div>
+    </div>
+</section>
+
+@code {
+    int count = 1;
+    char naira = (char)8358;
+    string largeString = "large";
+    string orderString = "orders";
+    string viewTable = "orders";
+    string tableSizeClass = "scanty";
+    User user = new();
+    List<User> users = new();
+    [Parameter]
+    public List<NewOrder> orders { get; set; } = new();
+    [Parameter]
+    public string TableTitle { get; set; } = "";
+    [Parameter]
+    public bool IsAdminAuthorized { get; set; }
+    List<Product> selectedProducts = new();
+    List<NewOrder> activeOrders = new();
+    protected override void OnInitialized()
+    {
+        if (orders.Count > 4)
+            tableSizeClass = "large";
+        activeOrders = orders;
+        users =  userController.ReadAllUsers().Result;
+    }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        count = 1;
+    }
+    private void View(List<Product> products)
+    {
+        selectedProducts = products;
+        viewTable = "products";
+        if (products.Count < 4)
+            tableSizeClass = "scanty";
+    }
+    private void ModifyOrder(NewOrder order)
+    {
+        if (order.Status.Equals(OrderStatus.Pending) && IsAdminAuthorized)
+        {
+            order.Status = OrderStatus.Approved;
+        }
+        else if (order.Status.Equals(OrderStatus.Approved) && IsAdminAuthorized)
+        {
+            order.Status = OrderStatus.Cancelled;
+        }
+        else if (order.Status.Equals(OrderStatus.Pending))
+        {
+            order.Status = OrderStatus.Cancelled;
+        }
+        else if (order.Status.Equals(OrderStatus.Cancelled))
+        {
+            order.Date = DateTime.Now;//For re-validating an order with the current date
+            order.Status = OrderStatus.Pending;
+        }
+        var isAdded = orderController.AddNewOrderForEasyLifeUpdate(order);
+    }
+    private void ViewUser(string userId)
+    {
+        viewTable = "user";
+        user = users.Find(u => u.Id.Equals(userId)) ?? new();
+        tableSizeClass = "scanty";
+    }
+    private void QueryAllOrders(ChangeEventArgs e)
+    {
+        string value = e.Value?.ToString() ?? "";
+        switch (value)
+        {
+            case "all":
+                activeOrders = orders;
+                break;
+            case "descending":
+                activeOrders = orders.OrderByDescending(x => x.Date).ToList();
+                break;
+            case "wallet":
+                activeOrders = orders.Where(x => x.PaymentChannel.Equals("wallet")).ToList();
+                break;
+            case "paystack":
+                activeOrders = orders.Where(x => x.PaymentChannel.Equals(PaymentOption.paystack)).ToList();
+                break;
+            case "pending":
+                activeOrders = orders.Where(x => x.Status.Equals(OrderStatus.Pending)).ToList();
+                break;
+            case "approved":
+                activeOrders = orders.Where(x => x.Status.Equals(OrderStatus.Approved)).ToList();
+                break;
+            case "cancelled":
+                activeOrders = orders.Where(x => x.Status.Equals(OrderStatus.Cancelled)).ToList();
+                break;
+            default:
+                activeOrders = new();
+                break;
+        }
+    }
+}
+

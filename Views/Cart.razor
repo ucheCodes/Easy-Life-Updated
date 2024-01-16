@@ -1,0 +1,131 @@
+﻿@inject IStore store@inject HttpClient httpClient@inject IOrderController orderController@inject IUserController userController@inject IMailService mailService@inject IProductController productController@inject NavigationManager navigationManager@inject IAccountController accountController@inject IEncryptionHelper encryptionHelper@implements IDisposable@if (store.State().Cart.Items.Count > 0)		  {		   <div>			@foreach (var item in store.State().Cart.Items)			{				<div class="box">						<i @onclick="(() => store.RemoveFromCart(item))" class="fas fa-trash"></i>						<div class="img">							<img src="@item.Filepath" alt="cart">						</div>						<div class="content">							<h3>@item.Name</h3>							<span class="price item">@naira @((item.Price * item.Quantity).ToString("N0"))</span>							<span class="quantity item">qty: @item.Quantity</span>							<div class="symbols" @onclick="(() => store.ComputeCartTotal())">								<span @onclick="(() => {item.Quantity++;})">&and;</span>								@if (item.Quantity > 1)								{								  <span @onclick="(() => {item.Quantity--;})">&or;</span>								}							</div>						</div>					</div>	   }		<div class="total">total : @naira @store.State().CartTotal.Total.ToString("N0")</div>			 <div>			 <div class="@msgClass">@message</div>			 <input disabled maxlength="140"  type="email" @bind="email" placeholder="Enter your email address" class="input">			 <input disabled maxlength="40"  type="tel" @bind="mobile" placeholder="Enter valid mobile number" class="input">			<select @bind="paymentChannel"  class="input">				<option value="null">Select Payment Channel</option>				<option value="cash">Pay Cash on Delivery</option>				<option value="paystack">Pay via Card</option>				<option value="wallet">Pay via Wallet</option>			 </select>			 </div>			<div class="coloured">				<small class="log">Pay @naira @store.State().CartTotal.Total.ToString("N0")</small>				@if (paymentChannel != "null")
+				{
+					<a @onclick="OrderUpdatedForEasyLifeOnly" class="btn">Confirm @naira @store.State().CartTotal.Total.ToString("N0")</a>
+				}		</div>	</div>}else{	<div>		<p>@cartMsg</p>	</div>}@code {
+	char naira = (char)8358;	string email = "";	string mobile = "";	string message = "";	string msg = "";
+	string msgClass = "error";
+	string cartMsg = "Empty Cart";	string paymentChannel = "null";	string domainName = "";	bool isEmailValid = false;	bool isMobileValid = false;	bool isUserContactInitialized = false;
+	Wallet userWallet = new();	List<User> users = new();
+	List<string> payments = new();	public string data { get; set; } = string.Empty;	string paystack_public_key = "";//"pk_test_89afab3000854e4e6ec835bf2f93c186403954ba";	string paystack_secret_key = "";//"sk_test_f2fe38be54d1f55fd08bedc1d8b4a218b11f13d4";	protected override async Task OnInitializedAsync()	{		users = await userController.ReadAllUsers();		var uri = new Uri(navigationManager.Uri);		domainName = uri.Host;		GetPaystackKeys();		store.AddStateChangedListeners(() => { StateHasChanged(); });	}	protected override void OnAfterRender(bool firstRender)//Continue here tomorrow	{		if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id) && !isUserContactInitialized)		{			email = store.State().ActiveUser.User.Email;			mobile = store.State().ActiveUser.User.Mobile;			isUserContactInitialized = true;
+			GetWalletData();		}
+		cartMsg = "Empty Cart";
+		message = "";
+		msgClass = "error";	}	private void GetLogisticFee(ChangeEventArgs e)	{		/*The drop down for this has been removed and changed to wallet payment drop down*/		double result = 0;//remember to add 100 naira to whatever logistic value		double.TryParse(e.Value?.ToString(), out result);		store.State().LogisticFee = result;		store.ComputeCartTotal();//whatever location chosen must be sent to orders	}	private async void GetPaystackKeys()	{		var dict = await productController.GetPaystackKeys();		if (dict != null  && dict.Count > 0)		{			paystack_public_key = dict["public"];			paystack_secret_key = dict["secret"];		}	}	private bool IsMobileValid(string mobile)	{		if (!string.IsNullOrEmpty(mobile))		{			//string pattern = @"^\+(?:\d{1,3})?\d{10}$";			string pattern = @"^(?:\+?\d{1,3})?(?:0|\d{1,4})\d{10}$";//@"^(?:\+?\d{1,3})?\d{10}$";			Regex regex = new Regex(pattern);			if (mobile.Contains("+") || (!mobile.Contains("+") && mobile.Length == 11 && mobile.StartsWith("0")))			{				isMobileValid = regex.IsMatch(mobile);				if (!isMobileValid)				{					message = "Mobile must have max of 14 characters \n" +						"It may include '+' sign, country code and mobile digits";				}				else { message = ""; }				return isMobileValid;			}			else			{				message = "Mobile number is not in a correct format";			}		}		return false;	}	private bool IsValidEmail(string email)	{		string pattern = @"^([\w\.\-]+)@([\w\-]+)((\.(\w){2,3})+)$";		Regex regex = new Regex(pattern);		this.isEmailValid = regex.IsMatch(email);		if (this.isEmailValid)		{			this.message = string.Empty;		}		else		{			this.message = "email field is invalid, email must be in the form abc@xyz.com";		}		return regex.IsMatch(email);	}	private void SendMail(string customerEmail, string reference)	{//review later when more than one campus is involved
+		string reviewLink = domainName + "/reviews";//hope it works		string mailBody = $"<p>Your order with reference Id {reference} is well received on {DateTime.Now.ToString("ddd, dd MMM yyyy")}. THANK YOU!!! for keeping us in business. </p><p>Click <a href=\"https://{reviewLink}\">{reviewLink}</a>.Kindly leave us a review about our service</p>";
+		var admins = users.Where(user => user.IsAdmin || user.AllowAcess).ToList();
+		foreach (var user in admins)		{
+			var mail = user.Email;			string body = $"<p>You have a new order placed by {customerEmail} on {DateTime.Now.ToString("ddd, dd MMM yyyy")} with reference Id {reference} in your E-commerce domain. Please do well to check and validate the transaction and do the needful.</p><p>Click <a href=\"https://{domainName}\">{domainName}</a> to access your E-commerce domain.</p>";			mailService.Send("peters.soft.network@gmail.com", mail, "New Order received at " + domainName, body);		}		mailService.Send("peters.soft.network@gmail.com", customerEmail, "New Order received at " + domainName, mailBody);	}
+	private bool PayByWallet()
+	{
+		if (paymentChannel.Equals("wallet") && userWallet.EncryptionId != "" && userWallet.WalletId != "" && userWallet.Balance > store.State().CartTotal.Total)
+		{
+			double previousBalance = userWallet.Balance;
+			userWallet.Balance -= store.State().CartTotal.Total;
+			string serializedData = JsonConvert.SerializeObject(userWallet);
+			string encryptionId = userWallet.EncryptionId;
+			DataFrom dataFrom = DataFrom.wallet;
+			var isSaved = accountController.EncryptData(serializedData, encryptionId, dataFrom);
+			if(isSaved.Result)
+			{
+				var isAdded = AddFundNotification(userWallet.WalletId, previousBalance, store.State().CartTotal.Total, userWallet.Balance);
+				message = "Payment by wallet successful!!!";
+				msgClass = "log";
+				previousBalance = 0;
+				return isAdded;
+			}
+		}
+		else
+		{
+			message = "Insufficient wallet funds, kindly fund your account or select another payment channel";
+			msgClass = "error";
+		}
+		return false;
+	}
+	private bool AddFundNotification(string walletId, double previousBalance, double creditAmount, double currentBalance)
+	{
+		var notif = new AccountNotification()
+			{
+				Id = Guid.NewGuid().ToString(),
+				UserId = store.State().ActiveUser.User.Id,
+				PaymentId = walletId,//modify to fit paystack reference Id
+				CreditType = CreditType.debit,
+				PreviousBalance = previousBalance,
+				TransactionalAmount = creditAmount,
+				CurrentBalance = currentBalance,
+				PaymentOption = PaymentOption.wallet,//Modify to fit paystack and cash on delivery
+				TransactionSection = TransactionSection.order,
+				Message = $"Purchase of item(s) worth {naira}{creditAmount}",//via wallet/cash/paystack with transaction Id 000xxref
+				Date = DateTime.Now
+			};
+		var isAdded = accountController.CreateAccountNotification(notif);
+		return isAdded.Result;
+	}
+	private async void AddToNewOrder(string paymentId,PaymentStatus p)
+	{
+		Random rnd = new Random();
+		//string userMobileCode = store.State().ActiveUser.User.Mobile
+		//.Substring((store.State().ActiveUser.User.Mobile.Length - 4), 4);
+		var newOrder = new NewOrder()
+			{
+				Date = DateTime.Now,
+				Id = Guid.NewGuid().ToString(),//$"{rnd.Next(1000, 9999)}/{userMobileCode}",
+				PaymentId = $"{paymentId}/{rnd.Next(1000, 9999)}",				Products = store.State().Cart.Items.ToList(),
+				Status = OrderStatus.Pending,
+				UserId = store.State().ActiveUser.User.Id,
+				Price = store.State().CartTotal.Total,
+				PaymentStatus = p,
+				PaymentChannel = paymentChannel
+			};
+		var isAdded = await orderController.AddNewOrderForEasyLifeUpdate(newOrder);
+		if (isAdded)
+		{
+			store.ClearCart();
+			cartMsg = "Wallet Transaction Validated! Thanks for your patronage";
+			//store.ShowCart(false);
+		    SendMail(store.State().ActiveUser.User.Email, paymentId);
+			//navigationManager.NavigateTo("/account");
+		}
+	}
+	private void OrderUpdatedForEasyLifeOnly()
+	{
+		if (string.IsNullOrEmpty(store.State().ActiveUser.User.Id))
+		{
+			store.LoginClick(false, true);
+		}
+		else if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Mobile) && !string.IsNullOrEmpty(store.State().ActiveUser.User.Email))
+		{
+			switch (paymentChannel)
+			{
+				case "wallet":
+					var isPaid = PayByWallet();
+					if (isPaid && userWallet.WalletId != "")
+					{
+						AddToNewOrder(userWallet.WalletId,PaymentStatus.Paid);
+					}
+					break;
+				default:
+					break;
+			}
+		}
+		else
+		{
+			message = "You cannot proceed without a valid Email and Mobile number, Kindly Edit account";
+			//store.ShowCart(false);
+			//navigationManager.NavigateTo("/account");
+		}
+	}
+	private async void GetWalletData()
+	{
+		if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id))
+		{
+			EncryptionKeeper encWalletData = await accountController.GetEncryptedData(store.State().ActiveUser.User.Id);
+			if (!string.IsNullOrEmpty(encWalletData.EncryptedSerializedData) && encWalletData.DataFrom.Equals(DataFrom.wallet))
+			{
+				string serializedWalletData = encryptionHelper.Decrypt(encWalletData.EncryptedSerializedData, encWalletData.EncryptionKey, encWalletData.EncryptionIV);
+				userWallet = JsonConvert.DeserializeObject<Wallet>(serializedWalletData) ?? new();
+			}
+		}
+	}	private async void Checkout()	{		if (IsValidEmail(email) && IsMobileValid(mobile))		{			msg = "please wait while we authenticate payment channel ...";			message = "";			var _data = new PaystackData()				{					amount = store.State().CartTotal.Total * 100, //in kobo					email = email,					key = paystack_public_key				};			data = JsonConvert.SerializeObject(_data);			// Send POST request to Paystack API with data and header// https://api.paystack.co/transaction/initialize			string paystackAuthorizationUrl = string.Empty;			bool isSuccess = false;			using (var request = new HttpRequestMessage(HttpMethod.Post, "https://api.paystack.co/transaction/initialize"))			{				request.Headers.Add("Authorization", $"Bearer {paystack_secret_key}");				var content = new StringContent(data, Encoding.UTF8, "application/json");				request.Content = content;				var response = await httpClient.SendAsync(request);				isSuccess = response.IsSuccessStatusCode;				if (response.IsSuccessStatusCode)				{					string responseContent = await response.Content.ReadAsStringAsync();					if (responseContent != null)					{						dynamic responseObject = JsonConvert.DeserializeObject<dynamic>(responseContent) ?? "";						paystackAuthorizationUrl = responseObject.data.authorization_url;						var order = new Orders()						{							Reference = responseObject.data.reference,							AccessCode = responseObject.data.access_code,							AuthorizationUrl = responseObject.data.authorization_url,							Email = email,							Mobile = mobile,							Products = store.State().Cart.Items.ToList(),							Date = DateTime.Now						};						navigationManager.NavigateTo(paystackAuthorizationUrl);						await orderController.AddPendingOrder(order);						SendMail(_data.email, order.Reference);					}				}			}			message = string.Empty;			store.SetPaystackAuthenticationUrl(isSuccess, paystackAuthorizationUrl);			if (isSuccess)			{				msg = ""; 			}		}		else		{			message = "please enter a valid mobile and email address";		}	}	public void Dispose()
+	{
+		store.RemoveStateChangedListeners(() => { StateHasChanged(); });
+	}}

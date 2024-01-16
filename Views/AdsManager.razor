@@ -1,0 +1,80 @@
+﻿@page "/manage-ads"
+@inject AdsControl adsControl
+
+@if (adsControl.AdsList.Count > 0)
+{
+    <section class="dynamic-table">
+        <div class="table-header">
+            <h1 class="heading">Ads <span>Manager</span></h1>
+        </div>
+        <div class="table">
+            <div class="table-body">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>S/N</th>
+                            <th>Link</th>
+                            <th>Description</th>
+                            <th>Image</th>
+                            <th>View Link</th>
+                            <th>Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var ad in adsControl.AdsList)
+                        {
+                            <tr>
+                                <td>@count</td>
+                                @if(ad.Link != "")
+                                {
+                                    <td>@ad.Link</td>
+                                }
+                                else
+                                {
+                                    <td>Nil</td>
+                                }
+                                <td>@ad.Desc</td>
+                                @if (!string.IsNullOrEmpty(ad.FilePath))
+                                {
+                                    <td><img src="@ad.FilePath" /></td>
+                                }
+                                else
+                                {
+                                    <td>No image</td>
+                                }
+                                @if (ad.Link != "")
+                                {
+                                    <td><a href="@ad.Link">view</a></td>
+                                }
+                                else
+                                {
+                                    <td>No Link</td>
+                                }
+                                <td @onclick="(() => Delete(ad.Id))"><i class="fas fa-trash"></i></td>
+                            </tr>
+                            count++;
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+    <Ads section="products"/>
+}
+else
+{
+    <p>No Ads registered on this platform</p>
+}
+
+@code {
+    int count = 0;
+    private void Delete(string id)
+    {
+        var isDel = adsControl.DeleteAds(id);
+        if (isDel.Result)
+        {
+            adsControl.AdsList = adsControl.AdsList.Where(a => a.Id != id).ToList();
+            count = 0;
+        }
+    }
+}
