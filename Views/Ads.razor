@@ -29,7 +29,7 @@
                             @slide.Desc &nbsp;&nbsp;
                             @if (slide.Link != "")
                             {
-                                <a href="@slide.Link">Click to learn more &rarr;</a>
+                                <a @onclick="(() =>TrackAds(slide.Link))" href="@slide.Link">Click to learn more &rarr;</a>
                             }
                         </h3>
                     </div>
@@ -79,6 +79,17 @@
                 slides = adsControl.AdsList;
             }
         }
+    }
+    private async void TrackAds(string adsUrl)
+    {
+        var tracker = new AdsTracker()
+            {
+                Id = Guid.NewGuid().ToString(),
+                Date = DateTime.Now,
+                AdsUrl = adsUrl,
+                User = store.State().ActiveUser.User
+            };
+            var c = await adsControl.CreateAdsTracker(tracker);
     }
     private void GenerateProductAds()
     {

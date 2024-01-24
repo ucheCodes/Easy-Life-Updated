@@ -46,7 +46,7 @@
                         @if (user.AllowAcess)
                         {
                             <td>
-                                <input type="checkbox" checked />
+                                 <input type="checkbox" @onchange="(() => GrantAcess(user))" checked />
                             </td>
                         }
                         else
@@ -103,7 +103,7 @@
     }
     private async void GrantAcess(User user)
     {
-        user.AllowAcess = true;
+        user.AllowAcess =! user.AllowAcess;
         await userController.AddUser(user);
     }
     private async void AddProjectName()

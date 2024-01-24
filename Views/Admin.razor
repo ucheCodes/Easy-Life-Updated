@@ -3,15 +3,17 @@
 @inject IUserController userController
 @inject IAccountController accountController
 @inject IOrderController orderController
+@inject IMailService mailService
 @implements IDisposable
 
 <section>
     <h1 class="heading">Admin <span>Panel</span></h1>
     <select @bind="selected" class="_input">
-        <option value="1">Fund Wallet</option>
-        <option value="2">View All New Orders</option>
-        <option value="3">View Notifications</option>
+        <option value="1">Fund  Users Wallet</option>
+        <option value="2">View All Users Wallet</option>
+        <option value="3">View Wallet Notifications</option>
         <option value="4">Add Account Info</option>
+        <option value="5">View All New Orders</option>
     </select>
     @switch (selected)
     {
@@ -33,20 +35,10 @@
             </div>
             break;
         case 2:
-            <NewOrderTable orders="newOrders" TableTitle="Orders" IsAdminAuthorized="true"/>
+            <UserWalletBalanceView Wallets="allWallets" Users="users"/>
             break;
         case 3:
-            <select @onchange="QueryWalletNotifications" class="select-center">
-                <option value="all">All</option>
-                <option value="descending">Dates Descending</option>
-                <option value="credit">Credits only</option>
-                <option value="debit">Debits only</option>
-                <option value="wallet">Payments via wallet only</option>
-                <option value="paystack">Payments Via Paystack</option>
-                <option value="cash">Payments on Deelivery (Cash)</option>
-            </select>
-            <DynamicTables TableTitle="Wallet Transactions"
-                   TableItems="walletNotifications" SkipHeaderNames="skipWalletFundingHeader" />
+            <WalletNotification IsFromAdmin=true allWalletNotifications="walletNotifications"/>
         break;
         case 4:
             <div class="admin-form">
@@ -56,6 +48,9 @@
                 <input @bind-value="accountNumber.Bank" placeholder="Enter Bank Name" />
                 <button @onclick="AddAccountNumber">Add Account</button>
             </div>
+            break;
+        case 5:
+            <NewOrderTable orders="newOrders" TableTitle="Orders" IsAdminAuthorized="true" />
             break;
         default:
         <div></div>
@@ -79,15 +74,13 @@
     List<AccountNotification> walletNotifications = new();
     List<AccountNotification> allWalletNotifications = new();
     List<NewOrder> newOrders = new();
+    List<User> users = new();
     protected override async Task OnInitializedAsync()
     {
         allWallets = await accountController.GetAndDecryptAllEncryptedData<Wallet>(DataFrom.wallet);
-        allWalletNotifications = await accountController.GetAccountNotifications("admin");
-        newOrders = (await orderController.GetAllNewOrdersForEasyLifeUpdate());
-    }
-    protected override void OnAfterRender(bool firstRender)
-    {
-        walletNotifications = allWalletNotifications;
+        walletNotifications = (await accountController.GetAccountNotifications("admin")).OrderByDescending(x => x.Date).ToList(); ;
+        newOrders = (await orderController.GetAllNewOrdersForEasyLifeUpdate()).OrderByDescending(x => x.Date).ToList();
+        users = await userController.ReadAllUsers();
     }
     private void SelectWallet(ChangeEventArgs e)
     {
@@ -117,38 +110,7 @@
             selectedWallet = new();
         }
     }
-    private void QueryWalletNotifications(ChangeEventArgs e)
-    {
-        string value = e.Value?.ToString() ?? "";
-        switch (value)
-        {
-            case "all":
-                walletNotifications = allWalletNotifications;
-                break;
-            case "descending":
-                walletNotifications = allWalletNotifications.OrderByDescending(x => x.Date).ToList();
-                break;
-            case "credit":
-                walletNotifications = allWalletNotifications.Where(x => x.CreditType.Equals(CreditType.credit)).ToList();
-                break;
-            case "debit":
-                walletNotifications = allWalletNotifications.Where(x => x.CreditType.Equals(CreditType.debit)).ToList();
-                break;
-            case "wallet":
-                walletNotifications = allWalletNotifications.Where(x => x.PaymentOption.Equals(PaymentOption.wallet)).ToList();
-                break;
-            case "paystack":
-                walletNotifications = allWalletNotifications.Where(x => x.PaymentOption.Equals(PaymentOption.paystack)).ToList();
-                break;
-            case "cash":
-                walletNotifications = allWalletNotifications.Where(x => x.PaymentOption.Equals(PaymentOption.cash)).ToList();
-                break;
-            default:
-                walletNotifications = new();
-                break;
-        }
-    }
-    private void ModifyFunds()
+    private async void ModifyFunds()
     {
         if (selectedWallet.EncryptionId != "" && selectedWallet.WalletId != "" && creditAmount > 0)
         {
@@ -163,10 +125,11 @@
                 AddFundNotification(selectedWallet.WalletId, previousBalance, creditAmount, selectedWallet.Balance);
                 message = "Fund Modified Successfully!!!";
                 msgClass = "log";
-                user = new();
+                await mailService.Send("peters.soft.network@gmail.com", user.Email, "PSN wallet Funds Activation", $"Your PSN wallet {selectedWallet.WalletId} is successfully credited with {naira}{creditAmount.ToString("N0")} on {DateTime.Now.ToString("MMM dd, yyyy")} {DateTime.Now.ToString("hh:mm:ss tt")}. Thanks for keeping us in business.");
                 previousBalance = 0;
                 creditAmount = 0;
                 selectedWallet = new();
+                user = new();
             }
         }
     }

@@ -324,6 +324,10 @@
               "target": "Package",
               "version": "[13.0.2, )"
             },
+            "SixLabors.ImageSharp": {
+              "target": "Package",
+              "version": "[3.1.2, )"
+            },
             "TinyMCE.Blazor": {
               "target": "Package",
               "version": "[1.0.4, )"

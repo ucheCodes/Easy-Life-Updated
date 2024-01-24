@@ -22,8 +22,7 @@
         }
         else if (selected == "2" && walletNotifications.Count > 0)
         {
-            <DynamicTables TableTitle="Wallet Transactions"
-                 TableItems="walletNotifications" SkipHeaderNames="skipWalletFundingHeader"/>
+            <WalletNotification allWalletNotifications="walletNotifications" />
         }
         else
         {
@@ -53,7 +52,7 @@
     protected override async Task OnInitializedAsync()
     {
         accountNumbers = await accountController.GetAccountNumbers();
-        walletNotifications = await accountController.GetAccountNotifications(wallet.UserId);
+        walletNotifications = (await accountController.GetAccountNotifications(wallet.UserId)).OrderByDescending(x => x.Date).ToList();
         AppendWalletIdToAccountNumber();
     }
     private void AppendWalletIdToAccountNumber()

@@ -12,11 +12,24 @@
         <select @onchange="QueryAllOrders" class="select-center">
             <option value="all">All Orders</option>
             <option value="descending">Dates Descending</option>
-            <option value="wallet">Payments via wallet only</option>
-            <option value="paystack">Payments via Card only</option>
+            <option value="wallet">Payments via wallet</option>
+            <option value="wallet and paid">Valid Payments via wallet</option>
+            <option value="wallet and cancelled">Cancelled Orders Paid via wallet</option>
+            <option value="paystack">Orders via ATM Card</option>
+            <option value="paystack and paid">Orders Paid via ATM Card</option>
+            <option value="paystack and not paid">Failed Payments via ATM Card</option>
+            <option value="cash">Payments via Cash</option>
+            <option value="cash and paid">Succssful Payments via Cash</option>
+            <option value="cash and not paid">Failed Payments via Cash</option>
             <option value="pending">Pending Orders</option>
+            <option value="pending and paid">Pending and Paid Orders</option>
+            <option value="pending and not paid">Pending and not Paid Orders</option>
             <option value="approved">Approved Orders</option>
+            <option value="approved and paid">Approved and Paid Orders</option>
+            <option value="approved and not paid">Approved and not Paid Orders</option>
             <option value="cancelled">Cancelled Orders</option>
+            <option value="cancelled and paid">Cancelled and Paid Orders</option>
+            <option value="cancelled and not paid">Cancelled and not Paid Orders</option>
         </select>
     }
     <div class="table @tableSizeClass">
@@ -43,9 +56,7 @@
                                 <td>@p.Name</td>
                                 <td>@naira@p.Price.ToString("N0")</td>
                                 <td>@p.Quantity</td>
-                                <td>@naira@(
-                            p.Price * p.Quantity
-                            )</td>
+                                <td>@naira@(p.Price * p.Quantity)</td>
                                 <td><img class="table-img" src="@p.Filepath" alt="@p.Name" /></td>
                                 <td @onclick="(() => {viewTable = orderString;tableSizeClass = largeString; })"><button class="icon">Back &larr;</button></td>
                             </tr>
@@ -80,7 +91,7 @@
                                 <td>@count</td>
                                 <td>@ord.PaymentId</td>
                                 <td>@ord.PaymentChannel</td>
-                                <td>@naira @ord.Price</td>
+                                <td>@naira @ord.Price.ToString("N0")</td>
                                 @if (ord.Status.Equals(OrderStatus.Pending))
                                 {
                                     <td class="yellow">
@@ -96,7 +107,7 @@
                                     <td class="log">@ord.Status</td>
                                 }
                                 <td @onclick="(() => View(ord.Products))" class="icon"><i class="fas fa-eye"></i></td>
-                                <td>@ord.Date.ToString("ddd, dd MMM yyyy")</td>
+                                <td>@ord.Date.ToString("dd/MM/yyyy")</td>
                                 <td>@ord.Date.ToString("hh : mm tt")</td>
                                 @if (ord.PaymentStatus.Equals(PaymentStatus.Paid))
                                 {
@@ -200,7 +211,16 @@
     {
         if (order.Status.Equals(OrderStatus.Pending) && IsAdminAuthorized)
         {
-            order.Status = OrderStatus.Approved;
+            //Modify to work and approve when cash is paid
+            if (order.PaymentChannel.Equals("cash"))
+            {
+                order.PaymentStatus = PaymentStatus.Paid;
+                order.Status = OrderStatus.Approved;
+            }
+            else if(!order.PaymentChannel.Equals("cash") && order.PaymentStatus.Equals(PaymentStatus.Paid))
+            {
+                order.Status = OrderStatus.Approved;
+            }
         }
         else if (order.Status.Equals(OrderStatus.Approved) && IsAdminAuthorized)
         {
@@ -237,17 +257,56 @@
             case "wallet":
                 activeOrders = orders.Where(x => x.PaymentChannel.Equals("wallet")).ToList();
                 break;
+            case "wallet and paid":
+                activeOrders = orders.Where(x => x.PaymentChannel.Equals("wallet") && x.PaymentStatus.Equals(PaymentStatus.Paid)).ToList();
+                break;
+            case "wallet and cancelled":
+                activeOrders = orders.Where(x => x.PaymentChannel.Equals("wallet") && x.Status.Equals(OrderStatus.Cancelled)).ToList();
+                break;
             case "paystack":
-                activeOrders = orders.Where(x => x.PaymentChannel.Equals(PaymentOption.paystack)).ToList();
+                activeOrders = orders.Where(x => x.PaymentChannel.Equals("paystack")).ToList();
+                break;
+            case "paystack and paid":
+                activeOrders = orders.Where(x => x.PaymentChannel.Equals("paystack") && x.PaymentStatus.Equals(PaymentStatus.Paid)).ToList();
+                break;
+            case "paystack and not paid":
+                activeOrders = orders.Where(x => x.PaymentChannel.Equals("paystack") && x.PaymentStatus.Equals(PaymentStatus.Not_Paid)).ToList();
+                break;
+            case "cash":
+                activeOrders = orders.Where(x => x.PaymentChannel.Equals("cash")).ToList();
+                break;
+            case "cash and paid":
+                activeOrders = orders.Where(x => x.PaymentChannel.Equals("cash") && x.PaymentStatus.Equals(PaymentStatus.Paid)).ToList();
+                break;
+            case "cash and not paid":
+                activeOrders = orders.Where(x => x.PaymentChannel.Equals("cash") && x.PaymentStatus.Equals(PaymentStatus.Not_Paid)).ToList();
                 break;
             case "pending":
                 activeOrders = orders.Where(x => x.Status.Equals(OrderStatus.Pending)).ToList();
                 break;
+            case "pending and paid":
+                activeOrders = orders.Where(x => x.Status.Equals(OrderStatus.Pending) && x.PaymentStatus.Equals(PaymentStatus.Paid)).ToList();
+                break;
+            case "pending and not paid":
+                activeOrders = orders.Where(x => x.Status.Equals(OrderStatus.Pending) && x.PaymentStatus.Equals(PaymentStatus.Not_Paid)).ToList();
+                break;
             case "approved":
                 activeOrders = orders.Where(x => x.Status.Equals(OrderStatus.Approved)).ToList();
                 break;
+            case "approved and paid":
+                activeOrders = orders.Where(x => x.Status.Equals(OrderStatus.Approved) && x.PaymentStatus.Equals(PaymentStatus.Paid)).ToList();
+                break;
+            case "approved and not paid":
+                activeOrders = orders.Where(x => x.Status.Equals(OrderStatus.Approved) && x.PaymentStatus.Equals(PaymentStatus.Not_Paid)).ToList();
+                break;
             case "cancelled":
                 activeOrders = orders.Where(x => x.Status.Equals(OrderStatus.Cancelled)).ToList();
+                break;
+            case "cancelled and paid":
+                activeOrders = orders.Where(x => x.Status.Equals(OrderStatus.Cancelled) && x.PaymentStatus.Equals(PaymentStatus.Paid)).ToList();
+                break;
+            case "cancelled and not paid":
+                activeOrders = orders.Where(x => x.Status.Equals(OrderStatus.Cancelled) && x.PaymentStatus.Equals(PaymentStatus.Not_Paid)).ToList();
                 break;
             default:
                 activeOrders = new();

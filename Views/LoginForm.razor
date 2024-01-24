@@ -28,7 +28,7 @@
                 <InputText maxlength="40" @bind-Value="user.Password" type="password" placeholder="enter password" class="box" />
                 <InputText maxlength="40" @bind-Value="user.Password2" type="password" placeholder="confirm password" class="box" />
                 <InputSelect maxlength="40" @bind-Value="user.Center" type="text" placeholder="choose center" class="box">
-                    @foreach(var center in Centers)
+                    @foreach(var center in Centers.states)
                     {
                         <option value="@center">@center</option>
                     }
@@ -58,7 +58,7 @@
     private string message = "";
     string domainName = "";
     public User user { get; set; } = new();
-    public List<String> Centers { get; set; } = new() { "Choose Center","UST, PH City","Others"};
+    public List<String> Centers2 { get; set; } = new() { "Choose Center","UST, PH City","Others"};
     public string FilePath { get; set; } = "./img/user-2.png";
     protected override void OnInitialized()
     {
@@ -207,14 +207,15 @@
     [Inject]
     private IWebHostEnvironment? _environment { get; set; }
     private long maxFileSize = 1024 * 1024 * 15;//reps 5MB
-                                               //private int maxAllowedFiles = 3;
+                                                //private int maxAllowedFiles = 3;
     private List<string> errors = new();
     private IBrowserFile? file;
 
     private async void LoadFile(InputFileChangeEventArgs e)
     {
         file = e.File;
-        string relativePath = await CaptureFile();
+        //string relativePath = await CaptureFile();
+        string relativePath = await ConvertImageToWebp();
         user.Filepath = relativePath;
     }
     private async Task<string> CaptureFile()
@@ -252,6 +253,34 @@
             throw;
         }
 
+    }
+    private async Task<string> ConvertImageToWebp()
+    {
+        try
+        {
+            var imageStream = file?.OpenReadStream(file.Size);
+            if (_environment != null && imageStream != null)
+            {
+                using (var image = await Image.LoadAsync(imageStream))
+                {
+                    var outputPath = Path.ChangeExtension("./Upload/" + Path.GetRandomFileName(), ".webp");
+                    string absolutePath = Path.Combine(_environment.WebRootPath, outputPath);
+                    // Ensure the directory exists
+                    Directory.CreateDirectory(Path.GetDirectoryName(absolutePath) ?? "");
+                    // Save the image as WebP
+                    using (var outputStream = new FileStream(absolutePath, FileMode.Create))
+                    {
+                        image.SaveAsWebp(outputStream);
+                    }
+                    return outputPath;//serves as relativePath
+                }
+            }
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+        return string.Empty;
     }
     public void Dispose()
     {

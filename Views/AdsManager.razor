@@ -65,9 +65,54 @@ else
 {
     <p>No Ads registered on this platform</p>
 }
+@if (trackedAds.Count > 0)
+{
+    <section class="dynamic-table">
+        <div class="table-header">
+            <h1 class="heading">Ads <span>Manager</span></h1>
+        </div>
+        <div class="table">
+            <div class="table-body">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>S/N</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Image</th>
+                            <th>Ads Link</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in trackedAds)
+                        {
+                           <tr>
+                               <td>@count</td>
+                               <td>@t.User.Username</td>
+                               <td>@t.User.Email</td>
+                               <td><img src="@t.User.Filepath" alt="No-Img" /></td>
+                               <td><a href="@t.AdsUrl">@t.AdsUrl</a></td>
+                                <td>@t.Date.ToString("dd/MM/yyyy")</td>
+                               <td>@t.Date.ToString("hh:mm tt")</td>
+                            </tr>
+                            count++;
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+}
 
 @code {
     int count = 0;
+    List<AdsTracker> trackedAds = new();
+    protected override void OnInitialized()
+    {
+        trackedAds = adsControl.GetAllAdsTrackers().Result;
+    }
     private void Delete(string id)
     {
         var isDel = adsControl.DeleteAds(id);

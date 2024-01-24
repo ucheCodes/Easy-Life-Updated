@@ -1,4 +1,5 @@
 ﻿using HKBlog.Database;
+using HKBlog.Models;
 using Newtonsoft.Json;
 
 namespace HKBlog.UI.Data
@@ -35,6 +36,31 @@ namespace HKBlog.UI.Data
                 AdsList = ads.OrderByDescending(a => a.Date).ToList();
             }
             //return ads;
+        }
+        public async Task<bool> CreateAdsTracker(AdsTracker adsTracker)
+        {
+            string key = JsonConvert.SerializeObject(adsTracker.Id);
+            string value = JsonConvert.SerializeObject(adsTracker);
+            bool isAdded = await database.Create("AdsTracker", key, value);
+            return isAdded;
+        }
+        public async Task<List<AdsTracker>> GetAllAdsTrackers()
+        {
+            List<AdsTracker> ads = new List<AdsTracker>();
+            var data = await database.ReadAll("AdsTracker");
+            if (data != null && data.Count() > 0)
+            {
+                foreach (var ad in data)
+                {
+                    var a = JsonConvert.DeserializeObject<AdsTracker>(ad.Value);
+                    if (a != null)
+                    {
+                        ads.Add(a);
+                    }
+                }
+                 ads.OrderByDescending(a => a.Date).ToList();
+            }
+            return ads;
         }
         public async Task<bool> DeleteAds(string id)
         {

@@ -229,8 +229,8 @@ h1 {
 }
 
 .header .icon div, .header .icon a, .table .icon i {
-    height: 4.5rem;
-    width: 4.5rem;
+    height: 4rem;
+    width: 4rem;
     line-height: 4.5rem;
     border-radius: .5rem;
     background: var(--background-color);

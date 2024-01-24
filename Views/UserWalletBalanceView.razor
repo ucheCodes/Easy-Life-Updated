@@ -1,0 +1,52 @@
+﻿@if (Wallets.Count > 0)
+{
+    <section class="dynamic-table">
+        <div class="table-header">
+            <h1 class="heading">User <span>Wallets</span></h1>
+        </div>
+        <div class="table">
+            <div class="table-body">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>S/N</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Wallet Id</th>
+                            <th>Balance (@naira)</th>
+                            <th>User Image</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var w in Wallets)
+                        {
+                            var user = Users.FirstOrDefault(u => u.Id.Equals(w.UserId));
+                            @if (user != null && user.Id != "")
+                            {
+                                <tr>
+                                    <td>@count</td>
+                                    <td>@user.Username</td>
+                                    <td>@user.Email</td>
+                                    <td>@w.WalletId</td>
+                                    <td>@naira@w.Balance.ToString("N0")</td>
+                                    <td><img src="@user.Filepath" alt="img" /></td>
+                                </tr>
+                            }
+                            count++;
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+}
+
+
+@code {
+    int count = 0;
+    char naira = (char)8358;
+    [Parameter]
+    public List<User> Users { get; set; } = new();
+    [Parameter]
+    public List<Wallet> Wallets { get; set; } = new();
+}

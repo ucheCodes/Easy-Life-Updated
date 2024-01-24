@@ -15,5 +15,6 @@
   </ItemGroup>
   <ImportGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
     <Import Project="$(NuGetPackageRoot)tinymce.blazor\1.0.4\buildTransitive\TinyMCE.Blazor.props" Condition="Exists('$(NuGetPackageRoot)tinymce.blazor\1.0.4\buildTransitive\TinyMCE.Blazor.props')" />
+    <Import Project="$(NuGetPackageRoot)sixlabors.imagesharp\3.1.2\build\SixLabors.ImageSharp.props" Condition="Exists('$(NuGetPackageRoot)sixlabors.imagesharp\3.1.2\build\SixLabors.ImageSharp.props')" />
   </ImportGroup>
 </Project>

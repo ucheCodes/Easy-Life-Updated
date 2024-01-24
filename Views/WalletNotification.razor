@@ -1,0 +1,167 @@
+﻿@inject IUserController userController
+
+<section class="dynamic-table">
+    <div class="table-header">
+        <h1 class="heading">Wallet Notifications</h1>
+    </div>
+    <select @onchange="QueryWalletNotifications" class="select-center">
+        <option value="all">All</option>
+        <option value="descending">Dates Descending</option>
+        <option value="credit">Credits only</option>
+        <option value="debit">Debits only</option>
+        <option value="wallet">Payments via wallet only</option>
+        <option value="paystack">Payments Via Paystack</option>
+        <option value="cash">Payments on Delivery (Cash)</option>
+    </select>
+    <div class="table @tableSizeClass">
+        <div class="table-body">
+            <table>
+                @if (viewTable == "notify")
+                {
+                    <thead>
+                        <tr>
+                            <th>S/N</th>
+                            <th>Payment Id</th>
+                            <th>Previous Balance</th>
+                            <th>Transaction Amount</th>
+                            <th>Current Balance</th>
+                            <th>Credit Type</th>
+                            <th>Section</th>
+                            <th>User</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            @if (IsFromAdmin)
+                            {
+                                <th>Message</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var n in walletNotifications)
+                        {
+                            <tr>
+                                <td>@count</td>
+                                <td>@n.PaymentId</td>
+                                <td>@n.PreviousBalance.ToString("N0")</td>
+                                <td>@n.TransactionalAmount.ToString("N0")</td>
+                                <td>@n.CurrentBalance.ToString("N0")</td>
+                                @if (n.CreditType.Equals(CreditType.credit))
+                                {
+                                    <td class="log">@n.CreditType</td>
+                                }
+                                else if(n.CreditType.Equals(CreditType.debit))
+                                {
+                                    <td class="error">@n.CreditType</td>
+                                }
+                                else 
+                                {
+                                    <td class="yellow">@n.CreditType</td>
+                                }
+                                <td>@n.TransactionSection</td>
+                                <td @onclick="(() => ViewUser(n.UserId))" class="icon"><i class="fas fa-user-alt"></i></td>
+                                <td>@n.Date.ToString("dd/MM/yyyy")</td>
+                                <td>@n.Date.ToString("hh : mm tt")</td>
+                                @if (IsFromAdmin)
+                                {
+                                    <td><p class="p">@n.Message</p></td>
+                                }
+                            </tr>
+                            count++;
+                        }
+                    </tbody>
+                }
+                else if (viewTable == "user")
+                {
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Mobile</th>
+                            <th>Image</th>
+                            <th>Back</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>@user.Username</td>
+                            <td>@user.Email</td>
+                            <td>@user.Mobile</td>
+                            <td><img class="table-img" src="@user.Filepath" alt="No img" /></td>
+                            <td @onclick="(() => {viewTable = notifyString;tableSizeClass = largeString; })"><button class="icon">Back &larr;</button></td>
+                        </tr>
+                    </tbody>
+                }
+            </table>
+        </div>
+    </div>
+</section>
+
+@code {
+    [Parameter]
+    public List<AccountNotification> allWalletNotifications { get; set; } = new();
+    [Parameter]
+    public bool IsFromAdmin { get; set; }
+    char naira = (char)8358;
+    int count = 1;
+    string tableSizeClass = "scanty";
+    string viewTable = "notify";
+    string notifyString = "notify";
+    string largeString = "large";
+    List<Product> selectedProducts = new();
+    User user = new();
+    List<User> users = new();
+    List<AccountNotification> walletNotifications = new();
+    protected override void OnInitialized()
+    {
+        walletNotifications = allWalletNotifications;
+        if (walletNotifications.Count > 4)
+            tableSizeClass = "large";
+        users = userController.ReadAllUsers().Result;
+    }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        count = 1;
+    }
+
+    private void ViewUser(string userId)
+    {
+        viewTable = "user";
+        user = users.Find(u => u.Id.Equals(userId)) ?? new();
+        tableSizeClass = "scanty";
+    }
+    private void QueryWalletNotifications(ChangeEventArgs e)
+    {
+        string value = e.Value?.ToString() ?? "";
+        switch (value)
+        {
+            case "all":
+                walletNotifications = allWalletNotifications;
+                break;
+            case "descending":
+                walletNotifications = allWalletNotifications.OrderByDescending(x => x.Date).ToList();
+                break;
+            case "credit":
+                walletNotifications = allWalletNotifications.Where(x => x.CreditType.Equals(CreditType.credit)).ToList();
+                break;
+            case "debit":
+                walletNotifications = allWalletNotifications.Where(x => x.CreditType.Equals(CreditType.debit)).ToList();
+                break;
+            case "wallet":
+                walletNotifications = allWalletNotifications.Where(x => x.PaymentOption.Equals(PaymentOption.wallet)).ToList();
+                break;
+            case "paystack":
+                walletNotifications = allWalletNotifications.Where(x => x.PaymentOption.Equals(PaymentOption.paystack)).ToList();
+                break;
+            case "cash":
+                walletNotifications = allWalletNotifications.Where(x => x.PaymentOption.Equals(PaymentOption.cash)).ToList();
+                break;
+            default:
+                walletNotifications = new();
+                break;
+        }
+        if (walletNotifications.Count > 4)
+            tableSizeClass = "large";
+        else
+            tableSizeClass = "scanty";
+    }
+}

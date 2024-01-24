@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "/de6e9+owmSPyc3t4PR8KCWh5L/lc55XrXiVmt07wRw=",
+  "Hash": "k4tzqP7FZOPHrr5BZYJrL8cZ/Sx/rgSfC/cAPAS6EHY=",
   "Source": "HKBlog.UI",
   "BasePath": "_content/HKBlog.UI",
   "Mode": "Default",
@@ -663,6 +663,23 @@
       "OriginalItemSpec": "wwwroot\\Upload\\1gwvapyt.jpg"
     },
     {
+      "Identity": "C:\\Users\\peter soft\\source\\repos\\Easy Life\\HKBlog\\HKBlog.UI\\wwwroot\\Upload\\1mgrljwq.uox.webp",
+      "SourceId": "HKBlog.UI",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\peter soft\\source\\repos\\Easy Life\\HKBlog\\HKBlog.UI\\wwwroot\\",
+      "BasePath": "_content/HKBlog.UI",
+      "RelativePath": "Upload/1mgrljwq.uox.webp",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\Upload\\1mgrljwq.uox.webp"
+    },
+    {
       "Identity": "C:\\Users\\peter soft\\source\\repos\\Easy Life\\HKBlog\\HKBlog.UI\\wwwroot\\Upload\\1pbvl5wm.jpg",
       "SourceId": "HKBlog.UI",
       "SourceType": "Discovered",
@@ -746,6 +763,40 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\Upload\\22hsegh0.jpg"
+    },
+    {
+      "Identity": "C:\\Users\\peter soft\\source\\repos\\Easy Life\\HKBlog\\HKBlog.UI\\wwwroot\\Upload\\230pj1t0.wez.webp",
+      "SourceId": "HKBlog.UI",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\peter soft\\source\\repos\\Easy Life\\HKBlog\\HKBlog.UI\\wwwroot\\",
+      "BasePath": "_content/HKBlog.UI",
+      "RelativePath": "Upload/230pj1t0.wez.webp",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\Upload\\230pj1t0.wez.webp"
+    },
+    {
+      "Identity": "C:\\Users\\peter soft\\source\\repos\\Easy Life\\HKBlog\\HKBlog.UI\\wwwroot\\Upload\\2hpi0ub3.hd1.webp",
+      "SourceId": "HKBlog.UI",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\peter soft\\source\\repos\\Easy Life\\HKBlog\\HKBlog.UI\\wwwroot\\",
+      "BasePath": "_content/HKBlog.UI",
+      "RelativePath": "Upload/2hpi0ub3.hd1.webp",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\Upload\\2hpi0ub3.hd1.webp"
     },
     {
       "Identity": "C:\\Users\\peter soft\\source\\repos\\Easy Life\\HKBlog\\HKBlog.UI\\wwwroot\\Upload\\2mmdmvvy.jpg",
@@ -1069,6 +1120,23 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\Upload\\b0xe23d5.png"
+    },
+    {
+      "Identity": "C:\\Users\\peter soft\\source\\repos\\Easy Life\\HKBlog\\HKBlog.UI\\wwwroot\\Upload\\b2ddvsfp.webp",
+      "SourceId": "HKBlog.UI",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\peter soft\\source\\repos\\Easy Life\\HKBlog\\HKBlog.UI\\wwwroot\\",
+      "BasePath": "_content/HKBlog.UI",
+      "RelativePath": "Upload/b2ddvsfp.webp",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\Upload\\b2ddvsfp.webp"
     },
     {
       "Identity": "C:\\Users\\peter soft\\source\\repos\\Easy Life\\HKBlog\\HKBlog.UI\\wwwroot\\Upload\\bflu2g0u.jpg",

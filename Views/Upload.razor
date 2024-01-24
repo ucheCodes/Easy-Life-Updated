@@ -188,7 +188,8 @@
     private async void LoadFile(InputFileChangeEventArgs e)
     {
         file = e.File;
-        string relativePath = await CaptureFile();
+        //string relativePath = await CaptureFile();//Modified to optimized uploaded Image
+        string relativePath = await ConvertImageToWebp();
         if (selected == 1)
         {
             store.State().ProductVal.ProductVal.Filepath = relativePath;
@@ -234,5 +235,33 @@
             throw;
         }
 
+    }
+    private async Task<string> ConvertImageToWebp()
+    {
+        try
+        {
+            var imageStream = file?.OpenReadStream(file.Size);
+            if (_environment != null && imageStream != null)
+            {
+                using (var image = await Image.LoadAsync(imageStream))
+                {
+                    var outputPath = Path.ChangeExtension("./Upload/" + Path.GetRandomFileName(), ".webp");
+                    string absolutePath = Path.Combine(_environment.WebRootPath, outputPath);
+                    // Ensure the directory exists
+                    Directory.CreateDirectory(Path.GetDirectoryName(absolutePath) ?? "");
+                    // Save the image as WebP
+                    using (var outputStream = new FileStream(absolutePath, FileMode.Create))
+                    {
+                        image.SaveAsWebp(outputStream);
+                    }
+                    return outputPath;//serves as relativePath
+                }
+            }
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+        return string.Empty;
     }
 }

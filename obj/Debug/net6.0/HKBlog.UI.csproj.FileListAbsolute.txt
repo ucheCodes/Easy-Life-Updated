@@ -192,3 +192,4 @@ C:\Users\peter soft\source\repos\Easy Life\HKBlog\HKBlog.UI\obj\Debug\net6.0\ref
 C:\Users\peter soft\source\repos\Easy Life\HKBlog\HKBlog.UI\obj\Debug\net6.0\HKBlog.UI.pdb
 C:\Users\peter soft\source\repos\Easy Life\HKBlog\HKBlog.UI\obj\Debug\net6.0\HKBlog.UI.genruntimeconfig.cache
 C:\Users\peter soft\source\repos\Easy Life\HKBlog\HKBlog.UI\obj\Debug\net6.0\ref\HKBlog.UI.dll
+C:\Users\peter soft\source\repos\Easy Life\HKBlog\HKBlog.UI\bin\Debug\net6.0\SixLabors.ImageSharp.dll
