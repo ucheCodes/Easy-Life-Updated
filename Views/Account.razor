@@ -1,5 +1,6 @@
 ﻿@page "/account"
 @inject IStore store
+@inject SignalRService signalR
 @inject IOrderController orderController
 @inject IAccountController accountController
 @inject IEncryptionHelper encryptionHelper
@@ -44,7 +45,7 @@
         </div>
     }
     <div class="box-container">
-        <div @onclick="EnableWallet" class="box">
+        <div @onclick="EnableWallet" class="box @(activeContainerClass == "wallet" ? "active" : "")">
             <h3>Wallet <i class="fas fa-wallet"></i></h3>
             <h3>@naira @userWallet.Balance</h3>
             @if (userWallet.UserId != "")
@@ -52,15 +53,15 @@
                 <strong>Wallet Id: @userWallet.WalletId</strong>
             }
         </div>
-        <div @onclick="ViewOrders" class="box">
+        <div @onclick="ViewOrders" class="box @(activeContainerClass == "orders" ? "active" : "")">
             <h3>Orders <i class="fas fa-shopping-bag"></i></h3>
             <h3>@newOrdersCount</h3>
         </div>
-        <div @onclick="(() => {selected = 3;})" class="box">
+        <div @onclick="ViewApproved" class="box @(activeContainerClass == "approved" ? "active" : "")">
             <h3>Deliveries <i class="fas fa-truck"></i></h3>
             <h3>@approved.Count</h3>
         </div>
-        <div @onclick="(ViewNotifications)" class="box">
+        <div @onclick="ViewNotifications" class="box @(activeContainerClass == "notif" ? "active" : "")">
             <h3>Notifications <i class="far fa-bell"></i></h3>
             <h3>@notificationsCount</h3>
         </div>
@@ -139,7 +140,6 @@
                         </table>
                     </div>
                 </section>
-                @*<DynamicTables TableItems="pt" InitializeSortByTime="true" TableTitle="Payment Details" />*@
             }
             else
             {
@@ -159,12 +159,14 @@
     int count = 1;
     int newOrdersCount = 0;
     int notificationsCount = 0;
+    string codeAcronym = "DF";
+    string activeContainerClass = "orders";
     Wallet userWallet = new();
-    List<Wallet> allWallets = new();
     List<AccountNumber> accountNumbers = new();
     List<AccountNotification> notifications = new();
 
     List<NewOrder> newOrders = new();
+    List<NewOrder> n = new();
     List<NewOrder> pending = new();
     List<NewOrder> approved = new();
     List<NewOrder> cancelled = new();
@@ -173,6 +175,7 @@
     List<PaystackTransaction> pt = new();
     List<Orders> delivered = new();
     List<string> IgnoreOrderHeader = new List<string>() { "AuthorizationUrl","Products", "IsValid" };
+    public HubConnection hubConnection => signalR.HubConnection;
     //protected override async Task  OnInitializedAsync()
     //{
     //    orders = (await orderController.GetAllOrders()).Where(d => d.Email.ToLower().Equals(store.State().ActiveUser.User.Email.ToLower())).ToList();
@@ -183,12 +186,24 @@
     //}
     protected override async Task OnInitializedAsync()
     {
-        newOrders = (await orderController.GetAllNewOrdersForEasyLifeUpdate()).Where(d => d.UserId.Equals(store.State().ActiveUser.User.Id)).OrderByDescending(x => x.Date).ToList();
-        notifications = (await accountController.GetAccountNotifications(store.State().ActiveUser.User.Id)).OrderByDescending(n => n.Date).ToList();
+        if (store.State().NewOrders.Data.Count > 0)
+        {
+            n = store.State().NewOrders.Data.ToList();
+        }
+        else
+        {
+            n = (await orderController.GetAllNewOrdersForEasyLifeUpdate()).OrderByDescending(x => x.Date).ToList();
+            store.UpdateNewOrders(n);
+        }
+        count = 1;
+        newOrders = n.Where(d => d.UserId.Equals(store.State().ActiveUser.User.Id)).OrderByDescending(x => x.Date).ToList();
         approved = newOrders.Where(x => x.Status.Equals(OrderStatus.Approved)).ToList();
         newOrdersCount = newOrders.Where(x => x.IsViewed.Equals(false)).ToList().Count;
-        notificationsCount = notifications.Where(n => !n.IsViewed).Count();
+        GetNotifications();
+        GetCodeAcronym();
         GetWalletData();
+        signalR.HubConnection.On<Wallet, AccountNotification>("NewWalletUpdate", OnNewWalletUpdate);
+        signalR.HubConnection.On<NewOrder>("NewOrderReceived", NewOrderReceived);
         store.AddStateChangedListeners(() => { StateHasChanged(); });
     }
     private void EditAccount()
@@ -196,47 +211,76 @@
         store.State().ActiveUser.User.IsEditAccount = true;
         store.LoginClick(true, false);
     }
+    private void GetCodeAcronym()
+    {
+        if (store.State().Project.Name.Equals("Easy Life"))
+        {
+            codeAcronym = "EL";
+        }
+        else if (store.State().Project.Name.Equals("Digicart"))
+        {
+            codeAcronym = "DG";
+        }
+        else if (store.State().Project.Name.Equals("PSN Cart"))
+        {
+            codeAcronym = "PNC";
+        }
+    }
+    private void GetNotifications()
+    {
+        notifications = store.State().AllWalletsInfo.AccountNotifications.Where(z => z.UserId.Equals(store.State().ActiveUser.User.Id)).ToList();
+        notificationsCount = notifications.Where(n => !n.IsViewed).Count();
+    }
     private void LogNewUser()
     {
         store.LoginClick(true, false);
     }
-    private void EnableWallet()
+    private async void EnableWallet()
     {
-        if (string.IsNullOrEmpty(store.State().ActiveUser.User.Id))
+        activeContainerClass = "wallet";
+        try
         {
-            store.LoginClick(false, true);
-        }
-        else
-        {
-            bool EncWalletExists = (accountController.EncryptedDataExists(store.State().ActiveUser.User.Id)).Result;
-            if (userWallet.UserId == "" && !EncWalletExists)
+            if (string.IsNullOrEmpty(store.State().ActiveUser.User.Id))
             {
-                int walletCount = accountController.GetEncryptedDataCount();
-                int code = walletCount + 1801;
-                Wallet w = new Wallet()
-                    {
-                        Balance = 0,
-                        UserId = store.State().ActiveUser.User.Id,
-                        WalletId = $"EL{code}",
-                        EncryptionId = store.State().ActiveUser.User.Id,
-                    };
-                string serializedData = JsonConvert.SerializeObject(w);
-                var isCreated = accountController.EncryptData(serializedData, w.EncryptionId, DataFrom.wallet);
-                if (isCreated.Result)
+                store.LoginClick(false, true);
+            }
+            else
+            {
+                bool EncWalletExists = (accountController.EncryptedDataExists(store.State().ActiveUser.User.Id)).Result;
+                if (userWallet.UserId == "" && !EncWalletExists)
                 {
-                    userWallet = w;
+                    int walletCount = accountController.GetEncryptedDataCount();
+                    int code = walletCount + 1200;
+                    Wallet w = new Wallet()
+                        {
+                            Balance = 0,
+                            UserId = store.State().ActiveUser.User.Id,
+                            WalletId = $"{codeAcronym}{code}",
+                            EncryptionId = store.State().ActiveUser.User.Id,
+                        };
+                    string serializedData = JsonConvert.SerializeObject(w);
+                    var isCreated = accountController.EncryptData(serializedData, w.EncryptionId, DataFrom.wallet);
+                    if (isCreated.Result)
+                    {
+                        var an = new AccountNotification() { };
+                        await signalR.HubConnection.SendAsync("AddNewWalletUpdate", w, an);
+                    }
                 }
+                else if (userWallet.UserId == "" && EncWalletExists)
+                {
+                    GetWalletData();
+                }
+                selected = 1;
             }
-            else if (userWallet.UserId == "" && EncWalletExists)
-            {
-                GetWalletData();
-            }
-            selected = 1;
+        }
+        catch (Exception)
+        {
         }
     }
     private void ViewOrders()
     {
         selected = 2;
+        activeContainerClass = "orders";
         var isAllNewOrdersViewed = newOrders.All(x => x.IsViewed);
         if (!isAllNewOrdersViewed)
         {
@@ -251,9 +295,15 @@
             newOrdersCount = 0;
         }
     }
+    private void ViewApproved()
+    {
+        activeContainerClass = "approved";
+        selected = 3;
+    }
     private void ViewNotifications()
     {
         selected = 4;
+        activeContainerClass = "notif";
         var isAllNotifViewed = notifications.All(x => x.IsViewed);
         if (!isAllNotifViewed)
         {
@@ -268,30 +318,45 @@
             notificationsCount = 0;
         }
     }
-    private string GenerateWalletId()
-    {
-        //Because of the recursiveness of a while loop, I choose not to use this code
-        //List<EncryptionKeeper> getWallets = accountController.GetAllEncryptedData(DataFrom.wallet).Result;
-        List<Wallet> getWallets = new();
-        bool isNumberGenerated = true;//set initial to true
-        Random rnd = new Random();
-        int number = 0;
-        while (isNumberGenerated)
-        {
-            number = rnd.Next(1000, 9999);
-            isNumberGenerated = getWallets.Any(x => x.WalletId.Equals(number.ToString()));
-        }
-        return number.ToString();
-    }
-    private async void GetWalletData()
+    private void GetWalletData()
     {
         if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id))
         {
-            EncryptionKeeper encWalletData = await accountController.GetEncryptedData(store.State().ActiveUser.User.Id);
-            if (!string.IsNullOrEmpty(encWalletData.EncryptedSerializedData) && encWalletData.DataFrom.Equals(DataFrom.wallet))
+            userWallet = store.State().AllWalletsInfo.Wallets.FirstOrDefault(x => x.UserId.Equals(store.State().ActiveUser.User.Id)) ?? new();
+        }
+    }
+    private void OnNewWalletUpdate(Wallet wallet, AccountNotification notif)
+    {
+        if (wallet.UserId.Equals(store.State().ActiveUser.User.Id))
+        {
+            userWallet = wallet;
+            List<Wallet> allWallets = store.State().AllWalletsInfo.Wallets.Where(x => x.WalletId != wallet.WalletId && x.UserId != wallet.UserId).ToList();
+            allWallets.Add(wallet);
+            List<AccountNotification> walletNotifications = store.State().AllWalletsInfo.AccountNotifications.ToList();
+            if (notif.Id != "")
             {
-                string serializedWalletData = encryptionHelper.Decrypt(encWalletData.EncryptedSerializedData, encWalletData.EncryptionKey, encWalletData.EncryptionIV);
-                userWallet = JsonConvert.DeserializeObject<Wallet>(serializedWalletData) ?? new();
+                walletNotifications.Insert(0, notif);
+                notifications.Insert(0, notif);
+                notificationsCount += 1;
+            }
+            count = 1;
+            store.UpdateWalletsInformation(allWallets, walletNotifications);
+            InvokeAsync(StateHasChanged);
+        }
+    }
+    private void NewOrderReceived(NewOrder order)
+    {
+        if (order.UserId.Equals(store.State().ActiveUser.User.Id))
+        {
+            newOrdersCount += 1;
+            if (!activeContainerClass.Equals("order"))//If order class is active, the signalR will fire in the NewOrderTable component
+            {
+                var orders = store.State().NewOrders.Data.ToList().Where(x => x.Id != order.Id).ToList();
+                orders.Insert(0, order);
+                newOrders.Insert(0, order);
+                store.UpdateNewOrders(orders);
+                approved = newOrders.Where(x => x.Status.Equals(OrderStatus.Approved)).ToList();
+                InvokeAsync(StateHasChanged);
             }
         }
     }

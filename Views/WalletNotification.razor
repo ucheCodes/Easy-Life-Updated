@@ -1,5 +1,5 @@
 ﻿@inject IUserController userController
-
+@inject IStore store
 <section class="dynamic-table">
     <div class="table-header">
         <h1 class="heading">Wallet Notifications</h1>
@@ -27,11 +27,11 @@
                             <th>Current Balance</th>
                             <th>Credit Type</th>
                             <th>Section</th>
-                            <th>User</th>
                             <th>Date</th>
                             <th>Time</th>
                             @if (IsFromAdmin)
                             {
+                                <th>User</th>
                                 <th>Message</th>
                             }
                         </tr>
@@ -43,7 +43,7 @@
                                 <td>@count</td>
                                 <td>@n.PaymentId</td>
                                 <td>@n.PreviousBalance.ToString("N0")</td>
-                                <td>@n.TransactionalAmount.ToString("N0")</td>
+                                <td><b>@n.TransactionalAmount.ToString("N0")</b></td>
                                 <td>@n.CurrentBalance.ToString("N0")</td>
                                 @if (n.CreditType.Equals(CreditType.credit))
                                 {
@@ -58,11 +58,11 @@
                                     <td class="yellow">@n.CreditType</td>
                                 }
                                 <td>@n.TransactionSection</td>
-                                <td @onclick="(() => ViewUser(n.UserId))" class="icon"><i class="fas fa-user-alt"></i></td>
                                 <td>@n.Date.ToString("dd/MM/yyyy")</td>
                                 <td>@n.Date.ToString("hh : mm tt")</td>
                                 @if (IsFromAdmin)
                                 {
+                                    <td @onclick="(() => ViewUser(n.UserId))" class="icon"><i class="fas fa-user-alt"></i></td>
                                     <td><p class="p">@n.Message</p></td>
                                 }
                             </tr>
@@ -114,9 +114,17 @@
     protected override void OnInitialized()
     {
         walletNotifications = allWalletNotifications;
+        if (store.State().Users.Data.Count > 0)
+        {
+            users = store.State().Users.Data.ToList();
+        }
+        else
+        {
+            users = userController.ReadAllUsers().Result;
+            store.UpdateUsersList(users);
+        }
         if (walletNotifications.Count > 4)
             tableSizeClass = "large";
-        users = userController.ReadAllUsers().Result;
     }
     protected override void OnAfterRender(bool firstRender)
     {

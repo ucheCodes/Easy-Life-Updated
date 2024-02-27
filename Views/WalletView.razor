@@ -1,4 +1,6 @@
 ﻿@inject IAccountController accountController
+@inject SignalRService signalR
+@inject IStore store
 
 <section>
     <div>
@@ -16,9 +18,10 @@
             <p class="p">
                 After the transfer, send an email with your name, the transfer amount,
                 date, time and your wallet Id to peters.soft.network@gmail.com
-                for admin confirmation. Kindly use "Easy Life Wallet Funding" as subject of the
+                for admin confirmation. Kindly use "@store.State().Project.Name Wallet Funding" as subject of the
                 mail. Thanks for keeping us in business.
             </p>
+            <p class="p">You can also send evidence of payment alongside your @store.State().Project.Name wallet Id to +2348181734574 on Whatsapp <a class="fab fa-whatsapp icon log" href="https://api.whatsapp.com/send?phone=2348181734574"></a></p>
         }
         else if (selected == "2" && walletNotifications.Count > 0)
         {
@@ -37,6 +40,7 @@
     [Parameter]
     public Wallet wallet { get; set; } = new();
     List<AccountNotification> walletNotifications = new();
+    public HubConnection hubConnection => signalR.HubConnection;
     List<AccountNumber> accountNumbers = new()
     {
         new AccountNumber(){Account_Name = "Uche Nwuju Victor", Account_Number = "3075623338", Bank = "First Bank Plc"}
@@ -52,8 +56,9 @@
     protected override async Task OnInitializedAsync()
     {
         accountNumbers = await accountController.GetAccountNumbers();
-        walletNotifications = (await accountController.GetAccountNotifications(wallet.UserId)).OrderByDescending(x => x.Date).ToList();
+        walletNotifications = store.State().AllWalletsInfo.AccountNotifications.Where(z => z.UserId.Equals(wallet.UserId)).ToList();
         AppendWalletIdToAccountNumber();
+        signalR.HubConnection.On<Wallet, AccountNotification>("NewWalletUpdate", OnNewWalletUpdate);
     }
     private void AppendWalletIdToAccountNumber()
     {
@@ -67,6 +72,14 @@
             {
                 num.Wallet_Id = wallet.WalletId;
             }
+        }
+    }
+    private void OnNewWalletUpdate(Wallet w, AccountNotification notif)
+    {
+        if (wallet.UserId.Equals(w.UserId) && wallet.WalletId.Equals(w.WalletId) && notif.Id != "")
+        {
+            walletNotifications.Insert(0, notif);
+            InvokeAsync(StateHasChanged);
         }
     }
 }

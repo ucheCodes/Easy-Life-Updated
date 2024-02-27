@@ -2,6 +2,7 @@
 @inject IUserController userController
 @inject IStore store
 @inject IMailService ms
+@inject SignalRService signalR
 @inject NavigationManager navigationManager
 @inject ProtectedLocalStorage localStorage
 @implements IDisposable
@@ -28,7 +29,8 @@
                 <InputText maxlength="40" @bind-Value="user.Password" type="password" placeholder="enter password" class="box" />
                 <InputText maxlength="40" @bind-Value="user.Password2" type="password" placeholder="confirm password" class="box" />
                 <InputSelect maxlength="40" @bind-Value="user.Center" type="text" placeholder="choose center" class="box">
-                    @foreach(var center in Centers.states)
+                    <option value="null">Select your nearest location</option>
+                    @foreach(var center in Centers.locations)
                     {
                         <option value="@center">@center</option>
                     }
@@ -60,6 +62,7 @@
     public User user { get; set; } = new();
     public List<String> Centers2 { get; set; } = new() { "Choose Center","UST, PH City","Others"};
     public string FilePath { get; set; } = "./img/user-2.png";
+    public HubConnection hubConnection => signalR.HubConnection;
     protected override void OnInitialized()
     {
         //user = new();
@@ -78,46 +81,50 @@
     }
     private async  void LogUser()
     {
-        if (user.IsEditAccount)//editing account
+        try
         {
-            isEmailvalid = IsValidEmail(user.Email);
-            IsMobileValid(user.Mobile);
-            user.IsEditAccount = false;
-        }
-        else
-        {
-            user.Id = Guid.NewGuid().ToString();
-            //user.IsEditAccount = false;
-            if (user.Username.Contains("/"))
+            if (user.IsEditAccount)//editing account
             {
-                var name = user.Username.Split("/");
-                user.Username = name[0];
-                if (name[1].Equals("_$admin$_"))
+                isEmailvalid = IsValidEmail(user.Email);
+                IsMobileValid(user.Mobile);
+                user.IsEditAccount = false;
+            }
+            else
+            {
+                user.Id = Guid.NewGuid().ToString();
+                if (user.Username.Contains("/"))
                 {
-                    user.IsAdmin = true;
-                    user.AllowAcess = true;
+                    var name = user.Username.Split("/");
+                    user.Username = name[0];
+                    if (name[1].Equals("$admin$"))
+                    {
+                        user.IsAdmin = true;
+                    }
                 }
             }
-        }
-        if (isEmailvalid && isMobileValid)
-        {
-            var isAdded = (await userController.AddUser(user));
-            if (isAdded)
+            if (isEmailvalid && isMobileValid)
             {
-                //isEmailOTPValid = false;
-                isEmailvalid = false;
-                //add user to state
-                store.LoginClick(false,false);//add user to cookie
-                store.AddActiveUser(user);
-                SaveUserToCookie(user.Id);
-                //Send Email to students
-                string body = $"<p>Sign up successful!!! Enjoy seamless shopping </p><p>with Easy Life <a href=\"https://{domainName}\">{domainName}</a></p>";
-                await ms.Send("peters.soft.network@gmail.com", user.Email, "Easy Life Sign up Successful!", body);
+                var isAdded = (await userController.AddUser(user));
+                if (isAdded)
+                {
+                    //isEmailOTPValid = false;
+                    isEmailvalid = false;
+                    //add user to state
+                    store.LoginClick(false, false);
+                    store.AddActiveUser(user);
+                    await signalR.HubConnection.SendAsync("AddNewUser", user, "add");
+                    //SaveUserToCookie(user.Id);//add user to cookie
+                    string body = $"<p>Sign up successful!!! Enjoy seamless shopping </p><p>Experience with {store.State().Project.Name} via <a href=\"https://{domainName}\">{domainName}</a></p>";
+                    await Task.Run(async () => await ms.Send("peters.soft.network@gmail.com", user.Email, $"PSN {store.State().Project.Name} E - Commerce registration Successful!", body));
+                }
+            }
+            else
+            {
+                message = "email or mobile adress invalid!!!";
             }
         }
-        else
+        catch (Exception)
         {
-            message = "email or mobile adress invalid!!!";
         }
     }
     private async void SaveUserToCookie(string userId)

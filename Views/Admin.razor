@@ -3,16 +3,21 @@
 @inject IUserController userController
 @inject IAccountController accountController
 @inject IOrderController orderController
+@inject SignalRService signalR
+@inject IStore store
 @inject IMailService mailService
 @implements IDisposable
 
 <section>
     <h1 class="heading">Admin <span>Panel</span></h1>
     <select @bind="selected" class="_input">
-        <option value="1">Fund  Users Wallet</option>
-        <option value="2">View All Users Wallet</option>
-        <option value="3">View Wallet Notifications</option>
-        <option value="4">Add Account Info</option>
+        @if (store.State().ActiveUser.User.IsAdmin)
+        {
+            <option value="1">Fund  Users Wallet</option>
+            <option value="2">View All Users Wallet</option>
+            <option value="3">View Wallet Notifications</option>
+            <option value="4">Add Account Info</option>
+        }
         <option value="5">View All New Orders</option>
     </select>
     @switch (selected)
@@ -31,11 +36,16 @@
                 <input readonly @bind-value="user.Username" placeholder="User's Wallet Name" />
                 <input readonly @bind-value="selectedWallet.WalletId" placeholder="User's Wallet Id" />
                 <input placeholder="Wallet Fund" @bind-value="creditAmount" />
+                <select @bind="walletAction">
+                    <option value="">Select Wallet Action</option>
+                    <option value="credit">Credit Wallet</option>
+                    <option value="revert">Debit Fund</option>
+                </select>
                 <button @onclick="ModifyFunds">Modify Funds</button>
             </div>
             break;
         case 2:
-            <UserWalletBalanceView Wallets="allWallets" Users="users"/>
+            <UserWalletBalanceView Wallets="allWallets"/>
             break;
         case 3:
             <WalletNotification IsFromAdmin=true allWalletNotifications="walletNotifications"/>
@@ -56,31 +66,39 @@
         <div></div>
         break;
     }
-
 </section>
 
 @code{
-    int selected = 1;
+    int selected = 5;
     char naira = (char)8358;
     string msgClass = "error";
     string walletSearchValue = "";
     string message = "";
     User user = new User();
     double creditAmount = 0;
+    string walletAction = "credit";
     List<Wallet> allWallets = new();
+    List<NewOrder> newOrders = new();
     Wallet selectedWallet = new();
     AccountNumber accountNumber = new();
     List<string> skipWalletFundingHeader = new() { "Id", "UserId" };
     List<AccountNotification> walletNotifications = new();
     List<AccountNotification> allWalletNotifications = new();
-    List<NewOrder> newOrders = new();
-    List<User> users = new();
+    public HubConnection hubConnection => signalR.HubConnection;
     protected override async Task OnInitializedAsync()
     {
-        allWallets = await accountController.GetAndDecryptAllEncryptedData<Wallet>(DataFrom.wallet);
-        walletNotifications = (await accountController.GetAccountNotifications("admin")).OrderByDescending(x => x.Date).ToList(); ;
-        newOrders = (await orderController.GetAllNewOrdersForEasyLifeUpdate()).OrderByDescending(x => x.Date).ToList();
-        users = await userController.ReadAllUsers();
+        allWallets = store.State().AllWalletsInfo.Wallets.OrderBy(x => x.WalletId).ToList();
+        walletNotifications = store.State().AllWalletsInfo.AccountNotifications.ToList();
+        if (store.State().NewOrders.Data.Count == 0)
+        {
+            newOrders = (await orderController.GetAllNewOrdersForEasyLifeUpdate()).OrderByDescending(x => x.Date).ToList();
+            store.UpdateNewOrders(newOrders);
+        }
+        else
+        {
+            newOrders = store.State().NewOrders.Data.ToList();
+        }
+        signalR.HubConnection.On<Wallet, AccountNotification>("NewWalletUpdate", OnNewWalletUpdate);
     }
     private void SelectWallet(ChangeEventArgs e)
     {
@@ -91,11 +109,22 @@
     {
         if (!string.IsNullOrEmpty(walletId))
         {
-            selectedWallet = allWallets.Find(w => w.WalletId.Equals(walletId)) ?? new();
+            selectedWallet = allWallets.FirstOrDefault(w => w.WalletId.Contains(walletId)) ?? new();
             if (selectedWallet.UserId != "")
             {
-                user = userController.ReadUser(selectedWallet.UserId).Result;
-                message = "";
+                user = store.State().Users.Data.FirstOrDefault(x => x.Id == selectedWallet.UserId) ?? new();
+                //userController.ReadUser(selectedWallet.UserId).Result;
+                if (user.Id == "")
+                {
+                    message = "User record no longer exists";
+                    msgClass = "error";
+                    selectedWallet = new();
+                    user = new();
+                }
+                else
+                {
+                    message = "";
+                }
             }
             else
             {
@@ -112,44 +141,74 @@
     }
     private async void ModifyFunds()
     {
-        if (selectedWallet.EncryptionId != "" && selectedWallet.WalletId != "" && creditAmount > 0)
+        try
         {
-            double previousBalance = selectedWallet.Balance;
-            selectedWallet.Balance += creditAmount;
-            string serializedData = JsonConvert.SerializeObject(selectedWallet);
-            string encryptionId = selectedWallet.EncryptionId;
-            DataFrom dataFrom = DataFrom.wallet;
-            var isSaved = accountController.EncryptData(serializedData, encryptionId, dataFrom);
-            if (isSaved.Result)
+            if (selectedWallet.EncryptionId != "" && selectedWallet.WalletId != "" && creditAmount > 0)
             {
-                AddFundNotification(selectedWallet.WalletId, previousBalance, creditAmount, selectedWallet.Balance);
-                message = "Fund Modified Successfully!!!";
-                msgClass = "log";
-                await mailService.Send("peters.soft.network@gmail.com", user.Email, "PSN wallet Funds Activation", $"Your PSN wallet {selectedWallet.WalletId} is successfully credited with {naira}{creditAmount.ToString("N0")} on {DateTime.Now.ToString("MMM dd, yyyy")} {DateTime.Now.ToString("hh:mm:ss tt")}. Thanks for keeping us in business.");
-                previousBalance = 0;
-                creditAmount = 0;
-                selectedWallet = new();
-                user = new();
+                CreditType creditType = CreditType.none;
+                double previousBalance = selectedWallet.Balance;
+                if (walletAction.Equals("credit"))
+                {
+                    selectedWallet.Balance += creditAmount;
+                    creditType = CreditType.credit;
+                }
+                else if (walletAction.Equals("revert") && selectedWallet.Balance > 0)
+                {
+                    selectedWallet.Balance -= creditAmount;
+                    creditType = CreditType.debit;
+                }
+                if (creditType != CreditType.none)
+                {
+                    string serializedData = JsonConvert.SerializeObject(selectedWallet);
+                    string encryptionId = selectedWallet.EncryptionId;
+                    DataFrom dataFrom = DataFrom.wallet;
+                    var isSaved = accountController.EncryptData(serializedData, encryptionId, dataFrom);
+                    if (isSaved.Result && walletAction != "")
+                    {
+                        AccountNotification notif = AddFundNotification(selectedWallet.WalletId, previousBalance, creditAmount, selectedWallet.Balance, creditType);
+                        message = "Fund Modified Successfully!!!";
+                        msgClass = "log";
+                        await signalR.HubConnection.SendAsync("AddNewWalletUpdate", selectedWallet, notif);
+                        await mailService.Send("peters.soft.network@gmail.com", user.Email, $"{store.State().Project.Name} wallet Funds Activation", $"Your {store.State().Project.Name} wallet {selectedWallet.WalletId} is successfully {creditType}ed with {naira}{creditAmount.ToString("N0")} on {DateTime.Now.ToString("MMM dd, yyyy")} {DateTime.Now.ToString("hh:mm tt")}. Thanks for keeping us in business.");
+                        previousBalance = 0;
+                        creditAmount = 0;
+                        selectedWallet = new();
+                        user = new();
+                    }
+                }
+                else
+                {
+                    message = "Fund Not Modified, select a wallet action!!!";
+                    msgClass = "error";
+                }
             }
         }
+        catch (Exception)
+        {
+        }
     }
-    private void AddFundNotification(string walletId, double previousBalance, double creditAmount, double currentBalance)
+    private AccountNotification AddFundNotification(string walletId, double previousBalance, double creditAmount, double currentBalance, CreditType creditType)
     {
         var notif = new AccountNotification()
             {
                 Id = Guid.NewGuid().ToString(),
                 UserId = user.Id,
                 PaymentId = walletId,
-                CreditType = CreditType.credit,
+                CreditType = creditType,
                 PreviousBalance = previousBalance,
                 TransactionalAmount = creditAmount,
                 CurrentBalance = currentBalance,
                 PaymentOption = PaymentOption.wallet,
                 TransactionSection = TransactionSection.admin,
-                Message = $"Credit of {naira} {creditAmount} from Admin to your Wallet",
+                Message = $"{creditType} of {naira} {creditAmount} from Admin to your Wallet {walletId}",
                 Date = DateTime.Now
             };
         var isAdded = accountController.CreateAccountNotification(notif);
+        if (isAdded.Result)
+        {
+            return notif;
+        }
+        return new();
     }
     private void AddAccountNumber()
     {
@@ -164,6 +223,18 @@
                 msgClass = "log";
             }
         }
+    }
+    private void OnNewWalletUpdate(Wallet wallet, AccountNotification notif)
+    {
+        allWallets = store.State().AllWalletsInfo.Wallets.Where(x => x.WalletId != wallet.WalletId && x.UserId != wallet.UserId).ToList();
+        allWallets.Add(wallet);
+        allWallets = allWallets.OrderBy(x => x.WalletId).ToList();
+        if (notif.Id != "")//Apply this where user will be a beneficiary
+        {
+            walletNotifications.Insert(0, notif);
+        }
+        store.UpdateWalletsInformation(allWallets, walletNotifications);
+        InvokeAsync(StateHasChanged);
     }
     public void Dispose()
     {

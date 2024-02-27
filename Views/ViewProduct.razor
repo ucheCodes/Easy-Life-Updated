@@ -62,13 +62,23 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (!string.IsNullOrWhiteSpace(Id))
+        if (store.State().ProductItems.Products.Count > 0)
+        {
+            product = store.State().ProductItems.Products.FirstOrDefault(p => p.Id.Equals(Id)) ?? new();
+            if (product != null && !string.IsNullOrWhiteSpace(product.Category))
+            {
+                var all = store.State().ProductItems.Products;
+
+                related = (all.Where(p => p.Category == product.Category)).ToList();
+            }
+        }
+        else 
         {
             product = await productController.GetProduct(Id);
             if (product != null && !string.IsNullOrWhiteSpace(product.Category))
             {
                 var all = await productController.GetProducts();
-
+                store.UpdateProducts(all);
                 related = (all.Where(p => p.Category == product.Category)).ToList();
             }
         }

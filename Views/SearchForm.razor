@@ -12,7 +12,20 @@
 
     protected async override Task OnInitializedAsync()
     {
-        products = await productController.GetProducts();
+        //products = await productController.GetProducts();
+        if (store.State().ProductItems.Products.Count > 0)
+        {
+            products = store.State().ProductItems.Products.ToList<Product>();
+        }
+        else
+        {
+            products = await productController.GetProducts();
+            if (products.Count > 0)
+            {
+                products = (products.OrderByDescending(p => p.Date)).ToList<Product>();
+                store.UpdateProducts(products);
+            }
+        }
     }
     private void Search()
     {

@@ -1,8 +1,10 @@
 ﻿@page "/orders"
+@inject IStore store
 @inject IOrderController orderController
 @inject IProductController productController
 @inject NavigationManager navigationManager
 @inject HttpClient httpClient
+@inject SignalRService signalR
 
 <section class="dynamic-table">
     <div class="table-header">
@@ -93,9 +95,14 @@ else if (message == "error")
             }
         </tbody>
     </table>
-    </div>
+            </div>
 }
-</div>
+else
+{
+    <p></p>
+    <p class="p">No Transaction recorded yet!</p>
+}
+    </div>
 </section>
 
 
@@ -107,13 +114,35 @@ else if (message == "error")
     string paystack_public_key = "";
     string tableSizeClass = "scanty";
     string paystack_secret_key = "";//"sk_test_f2fe38be54d1f55fd08bedc1d8b4a218b11f13d4";
+    public HubConnection hubConnection => signalR.HubConnection;
     protected override async Task OnInitializedAsync()
     {
         GetPaystackKeys();
-        newOrders = await orderController.GetAllNewOrdersForEasyLifeUpdate();
-        orders = (await orderController.GetAllOrders()).OrderByDescending(x => x.Date).ToList<Orders>();
+        if (store.State().Orders.Data.Count > 0)
+        {
+            orders = store.State().Orders.Data.ToList();
+        }
+        else
+        {
+            orders = (await orderController.GetAllOrders()).OrderByDescending(x => x.Date).ToList<Orders>();
+            store.UpdateOrders(orders);
+        }
+
+        if (store.State().NewOrders.Data.Count > 0)
+        {
+            newOrders = store.State().NewOrders.Data.ToList();
+        }
+        else
+        {
+            newOrders = await orderController.GetAllNewOrdersForEasyLifeUpdate();
+            store.UpdateNewOrders(newOrders);
+        }
+
         if (orders.Count > 5)
+        {
             tableSizeClass = "large";
+        }
+        signalR.HubConnection.On<Orders>("OrderReceived", OrderReceived);
     }
     protected override void OnAfterRender(bool firstRender)
     {
@@ -132,6 +161,12 @@ else if (message == "error")
     {
         order.IsDelivered = !order.IsDelivered;
         var isAdded = await orderController.AddPendingOrder(order);
+    }
+    public void OrderReceived(Orders order)
+    {
+        orders.Insert(0, order);
+        store.UpdateOrders(orders);
+        InvokeAsync(StateHasChanged);
     }
     private void View(string id)
     {

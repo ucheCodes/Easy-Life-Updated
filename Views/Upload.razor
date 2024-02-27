@@ -2,6 +2,7 @@
 @inject IProductController productController
 @inject IStore store
 @inject AdsControl adsControl
+@inject SignalRService signalR
 @implements IDisposable
 
 
@@ -91,22 +92,19 @@
     public List<string> Categories { get; set; } = new();
     int selected = 1;
     string message = "";
-    protected override async Task OnInitializedAsync()
+    public HubConnection hubConnection => signalR.HubConnection;
+    protected override void OnInitialized()
     {
-        Categories = await productController.GetCategories();
-        if (Categories.Count > 0)
-        {
-            store.State().ProductVal.ProductVal.Category = Categories[0];//faulty state variable
-        }
         store.AddStateChangedListeners(() => { StateHasChanged(); });
     }
-    protected async override Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnAfterRender(bool firstRender)
     {
-        products = await productController.GetProducts();
-    }
-    public void Dispose()
-    {
-        store.RemoveStateChangedListeners(() => { StateHasChanged(); });
+        if (store.State().CategoryList.Categories.Count > 0 && store.State().ProductVal.ProductVal.Id == "")
+        {
+            store.State().ProductVal.ProductVal.Category = store.State().CategoryList.Categories[0];
+        }
+        Categories = store.State().CategoryList.Categories.ToList();
+        products = store.State().ProductItems.Products.ToList<Product>();
     }
     public void AddAds()
     {
@@ -117,8 +115,8 @@
             var isAdded = adsControl.AddAds(ads);
             if(isAdded.Result)
                 store.ShowUpload(false);
-                message = "";
-                ads = new();
+            message = "";
+            ads = new();
         }
         else
         {
@@ -136,22 +134,26 @@
 
             store.State().ProductVal.ProductVal.Date = DateTime.Now;
             store.State().ProductVal.ProductVal.Quantity = 1;
-            store.State().ProductVal.ProductVal.Price = ComputeTax(store.State().ProductVal.ProductVal.Price);
             product = store.State().ProductVal.ProductVal;
-            var isAdded = await productController.AddProduct(product);
-            if (isAdded)
+            try
             {
-                store.ShowUpload(false);
-                store.ChangeProductVal(new());///store.State().ProductItems.Products
-                var isExist = products.Any(p => p.Id == product.Id);
-                if (isExist)
+                var isAdded = await productController.AddProduct(product);
+                if (isAdded)
                 {
-                    products = products.Where(p => p.Id != product.Id).ToList();
+                    store.ShowUpload(false);
+                    store.ChangeProductVal(new());
+                    var isExist = products.Any(p => p.Id == product.Id);
+                    if (isExist)
+                    {
+                        products = products.Where(p => p.Id != product.Id).ToList();
+                    }
+                    products.Insert(0,product);
+                    await signalR.HubConnection.SendAsync("UpdateProducts", products);
+                    message = string.Empty;
                 }
-                products.Add(product);
-                products = (products.OrderByDescending(p => p.Date)).ToList<Product>();
-                store.UpdateProducts(products);
-                message = string.Empty;
+            }
+            catch (Exception)
+            {
             }
         }
         else
@@ -181,7 +183,7 @@
     [Inject]
     private IWebHostEnvironment? _environment { get; set; }
     private long maxFileSize = 1024 * 1024 * 5;//reps 5MB
-                                               //private int maxAllowedFiles = 3;
+    //private int maxAllowedFiles = 3;
     private List<string> errors = new();
     private IBrowserFile? file;
 
@@ -263,5 +265,11 @@
             return string.Empty;
         }
         return string.Empty;
+    }
+
+
+    public void Dispose()
+    {
+        store.RemoveStateChangedListeners(() => { StateHasChanged(); });
     }
 }

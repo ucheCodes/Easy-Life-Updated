@@ -35,7 +35,6 @@ namespace HKBlog.UI.Data
                 }
                 AdsList = ads.OrderByDescending(a => a.Date).ToList();
             }
-            //return ads;
         }
         public async Task<bool> CreateAdsTracker(AdsTracker adsTracker)
         {

@@ -1,30 +1,41 @@
 ﻿@inject IStore store
 @inject AdsControl adsControl
 @inject ProtectedLocalStorage localStorage
+@inject IUserController userController
 @inject IProductController productController
+@inject SignalRService signalR
 @inject IUserController uc
 @inject IDatabase database
 @inject NavigationManager navigationManager
 
 <header class="header">
-    <span class="logo">@projectName <i class="fas fa-shopping-cart"></i></span>
+    @if (store.State().ActiveUser.User.Filepath != "")
+    {
+        <span class ="logo">@projectName <img src="@store.State().ActiveUser.User.Filepath" /></span>
+    }
+    else
+    {
+        <span class="logo">@projectName <i class="fas fa-shopping-cart"></i></span>
+    }
 
     <nav @onclick="ToggleOff" class="@navbarClass">
         <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Shop</NavLink>
         <NavLink class="nav-link" href="account">Account</NavLink>
         <NavLink class="nav-link" href="reviews">Reviews</NavLink>
-        @if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id) && store.State().ActiveUser.User.AllowAcess)
+        @if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id) && (store.State().ActiveUser.User.IsAdmin || store.State().ActiveUser.User.IsVendor))
         {
-            <NavLink class="nav-link" href="" @onclick="logUpload">Upload</NavLink>
             <NavLink class="nav-link" href="orders"> Orders</NavLink>
-            <NavLink class="nav-link" href="manage-ads">Ads</NavLink>
-            <NavLink class="nav-link" href="users">Users</NavLink>
-           <span class="print">
-                <NavLink class="nav-link" href="print">Print</NavLink>
-           </span>
             <NavLink class="nav-link" href="admin">Admin</NavLink>
         }
-        
+        @if (store.State().ActiveUser.User.IsAdmin)
+        {
+            <NavLink class="nav-link" href="" @onclick="logUpload">Upload</NavLink>
+            <NavLink class="nav-link" href="manage-ads">Ads</NavLink>
+            <NavLink class="nav-link" href="users">Users</NavLink>
+            <span class="print">
+                <NavLink class="nav-link" href="print">Print</NavLink>
+            </span>
+        }
     </nav>
 
     <div class="icon">
@@ -81,10 +92,13 @@
     private string shoppingCartClass => store.State().CartClicker.ShowCart ? "shopping-cart active" : "shopping-cart";
 
     private string UploadClass => store.State().UploadClicker.ShowUpload ? "login-form upload-form active" : "upload-form";
+    public HubConnection hubConnection => signalR.HubConnection;
     protected override async Task OnInitializedAsync()
     {
         GetProjectName();
+        GetAllUsers();
         await adsControl.GetAds();
+        signalR.HubConnection.On<User,string>("AddNewUser", OnNewUserAdded);
         store.AddStateChangedListeners(() => { updateChange(); });
     }
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -171,6 +185,7 @@
         if (!string.IsNullOrEmpty(data.Value))
         {
             projectName = JsonConvert.DeserializeObject<string>(data.Value) ?? "Shop Now";
+            store.AddProjectName(projectName);
         }
     }
 
@@ -193,5 +208,24 @@
     private void logUpload()
     {
         store.ShowUpload(true);
+    }
+    private void GetAllUsers()
+    {
+        var Users = userController.ReadAllUsers().Result;
+        store.UpdateUsersList(Users);
+    }
+    private void OnNewUserAdded(User user, string operation)
+    {
+        List<User> users = store.State().Users.Data.ToList();
+        if (operation == "add")
+        {
+            users.Add(user);
+        } 
+        else if(operation == "delete")
+        {
+            users = users.Where(u => u.Id != user.Id).ToList();
+        }
+        store.UpdateUsersList(users);
+        InvokeAsync(StateHasChanged);
     }
 }

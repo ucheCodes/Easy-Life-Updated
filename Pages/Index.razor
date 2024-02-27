@@ -1,6 +1,7 @@
 ﻿@page "/"
 @inject NavigationManager navManager
 @inject IEncryptionHelper encHelper
+@inject IAccountController accountController
 @inject IStore store
 @implements IDisposable
 
@@ -9,16 +10,60 @@
 @code {
     protected override void OnInitialized()
     {
+        GetAllWalletInformation();
         store.AddStateChangedListeners(() => { StateHasChanged(); });
     }
-
+    public async void GetAllWalletInformation()
+    {
+        List<Wallet> allWallets = (await accountController.GetAndDecryptAllEncryptedData<Wallet>(DataFrom.wallet));
+        List<AccountNotification>  walletNotifications = (await accountController.GetAccountNotifications("admin")).OrderByDescending(x => x.Date).ToList();
+        store.UpdateWalletsInformation(allWallets, walletNotifications);
+    }
     public void Dispose()
     {
         store.RemoveStateChangedListeners(() => { StateHasChanged(); });
     }
         /*
          * Debug entire application before release
-         * Fix mail asynchronous latency
+         * Try best to fix uploading bug
+         * <i class="fas fa-hourglass-end"></i> use this to denote product out of stock
+         * Work on users setting delivery address and adding logistic fees on cart page
+         * Work on incorporating multiple images, ask GPT before incorporating
+         * Add a concrete inventory and statistic management with chart
+         * Enable UserCookie() after app debug series
+         * Find out why order in Vendor's menu is not ordered descending
+         */
+
+
+        /*
+         * Inventory management guide
+         * On Admin guide, create a table where admin have access to all the products
+         * Add a new property IsProductInStock so that I can disable it whenever a product is out of stock
+         * Be able to enable and disable that property from here
+         * Add an input that can make me add quantity of that product to be supplied to vendor
+         * Create a drop down to show table that has all the vendors so I can choose the vendor I am
+         * sending the products to
+         * Save that information to db and also a place where the chosen vendor have to be the one
+         * to confirm the product sent to her in stock.
+         * 
+         * The vendors menu should have a place to show new unapproved stocks
+         * when it is approved, using signalr for updating it
+         * 
+         * Another table should keep product statistic relating to a vendor 
+         * Total number of products that have been sent to the vendor, the number that is sold already
+         * And also the number that is left available
+         * When the vendor wants to view sales statistic, use the id of any particular product,
+         * loop through the new order database that will now provide all the sales statistics
+         * including date, quantity and customer that purchased it
+         * From the data, we can compute monthly, weekly percentage sales and show the chart if need be
+         * 
+         * Admin's page should have a way to toggle between vendor's so as to view independent
+         * vendors progress and it should also be able to display it all
+         * 
+         * On a separate table which will be visible to vendor, I keep  a statistics of the goods pushed out 
+         * and the days they were pushed out
+         * This data and information should work relatively with the one vendor will approve
+         * such that when vendor approves it, it will now be visible
          */
 }
 

@@ -1,4 +1,7 @@
-﻿@if (Wallets.Count > 0)
+﻿@inject IStore store
+@inject IUserController userController
+
+@if (Wallets.Count > 0)
 {
     <section class="dynamic-table">
         <div class="table-header">
@@ -12,6 +15,7 @@
                             <th>S/N</th>
                             <th>Name</th>
                             <th>Email</th>
+                            <th>Mobile</th>
                             <th>Wallet Id</th>
                             <th>Balance (@naira)</th>
                             <th>User Image</th>
@@ -20,13 +24,14 @@
                     <tbody>
                         @foreach (var w in Wallets)
                         {
-                            var user = Users.FirstOrDefault(u => u.Id.Equals(w.UserId));
+                            var user = store.State().Users.Data.ToList().FirstOrDefault(u => u.Id.Equals(w.UserId));
                             @if (user != null && user.Id != "")
                             {
                                 <tr>
                                     <td>@count</td>
                                     <td>@user.Username</td>
                                     <td>@user.Email</td>
+                                    <td>@user.Mobile</td>
                                     <td>@w.WalletId</td>
                                     <td>@naira@w.Balance.ToString("N0")</td>
                                     <td><img src="@user.Filepath" alt="img" /></td>
@@ -46,7 +51,13 @@
     int count = 0;
     char naira = (char)8358;
     [Parameter]
-    public List<User> Users { get; set; } = new();
-    [Parameter]
     public List<Wallet> Wallets { get; set; } = new();
+    protected override void OnInitialized()
+    {
+        count = 0;
+    }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        count = 1;
+    }
 }

@@ -1,6 +1,7 @@
 ﻿@page "/users"
 @inject IUserController userController
 @inject IProductController productController
+@inject SignalRService signalR
 @inject IStore store
 @inject IDatabase database
 @implements IDisposable
@@ -21,8 +22,9 @@
                     <th>Image</th>
                     @if (store.State().ActiveUser.User != null && store.State().ActiveUser.User.IsAdmin)
                     {
-                        <th>Has Admin Acess</th>
+                        <th>Is Vendor?</th>
                     }
+                    <th>Delete</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -43,7 +45,7 @@
                     }
                     @if (store.State().ActiveUser.User != null && store.State().ActiveUser.User.IsAdmin)
                     {
-                        @if (user.AllowAcess)
+                        @if (user.IsVendor)
                         {
                             <td>
                                  <input type="checkbox" @onchange="(() => GrantAcess(user))" checked />
@@ -56,6 +58,7 @@
                             </td>
                         }
                     }
+                    <td @onclick="(() => DeleteUser(user.Id))"><i class="fas fa-trash icon cursor-pointer"></i></td>
                 </tr>
                 count++;
                 }
@@ -86,9 +89,19 @@
     string tableSizeClass = "scanty";
     int count = 0;
     public string FilePath { get; set; } = "./img/user-2.png";
+    public HubConnection hubConnection => signalR.HubConnection;
+
     protected async override Task OnInitializedAsync()
     {
-        users = await userController.ReadAllUsers();
+        if (store.State().Users.Data.Count > 0)
+        {
+            users = store.State().Users.Data.ToList();
+        }
+        else
+        {
+            users = await userController.ReadAllUsers();
+            store.UpdateUsersList(users);
+        }
         if (users.Count > 5)
             tableSizeClass = "large";
         store.AddStateChangedListeners(() => { StateHasChanged(); });
@@ -103,7 +116,7 @@
     }
     private async void GrantAcess(User user)
     {
-        user.AllowAcess =! user.AllowAcess;
+        user.IsVendor =! user.IsVendor;
         await userController.AddUser(user);
     }
     private async void AddProjectName()
@@ -115,8 +128,25 @@
             var isAdded = await database.Create("Project", key, value);
             if (isAdded)
             {
+                store.AddProjectName(projectName);
                 projectName = string.Empty;
             }
+        }
+    }
+    private async void DeleteUser(string id)
+    {
+        try
+        {
+            var isDeleted = await userController.DeleteUser(id);
+            if (isDeleted)
+            {
+                User user = users.FirstOrDefault(x => x.Id == id) ?? new();
+                users = users.Where(u => u.Id != id).ToList();
+                await signalR.HubConnection.SendAsync("AddNewUser", user, "delete");
+            }
+        }
+        catch (Exception)
+        {
         }
     }
     private void SaveKeys()
@@ -126,7 +156,11 @@
         {
             dict.Add("public", publicKey);
             dict.Add("secret", secretKey);
-            productController.AddPaystackKey(dict);
+            var isAdded = productController.AddPaystackKey(dict);
+            if (isAdded.Result)
+            {
+                publicKey = ""; secretKey = "";
+            }
         }
     }
 }

@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.Hosting;
 using HKBlog.Models;
+using HKBlog.UI.Views;
+using HKBlog.States.SubStates;
 
 namespace HKBlog.UI.Data
 {
@@ -24,6 +26,26 @@ namespace HKBlog.UI.Data
             {
                 await Clients.All.SendAsync("AddReview", review);
             }
+        }
+        public async void UpdateProducts(List<Product> products)
+        {
+            await Clients.All.SendAsync("UpdateProducts", products);
+        }
+        public async void NewOrderReceived(NewOrder order)
+        {
+            await Clients.All.SendAsync("NewOrderReceived", order);
+        }
+        public async void OrderReceived(Orders order)
+        {
+            await Clients.All.SendAsync("OrderReceived", order);
+        }
+        public async void AddNewWalletUpdate(Wallet wallet, AccountNotification notification)
+        {
+            await Clients.All.SendAsync("NewWalletUpdate", wallet, notification);
+        }
+        public async void AddNewUser(User user,string operation)
+        {
+            await Clients.All.SendAsync("AddNewUser", user, operation);
         }
     }
 }

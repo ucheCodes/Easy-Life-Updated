@@ -2,6 +2,7 @@
 @inject IOrderController orderController
 @inject IUserController userController
 @inject IStore store
+@inject SignalRService signalR
 
 <section class="dynamic-table">
     <div class="table-header">
@@ -11,6 +12,10 @@
     {
         <select @onchange="QueryAllOrders" class="select-center">
             <option value="all">All Orders</option>
+            <option value="today">Today's Orders</option>
+            <option value="pending today">Today's Pending Orders</option>
+            <option value="approved today">Today's Approved Orders</option>
+            <option value="cancelled today">Today's Cancelled Orders</option>
             <option value="descending">Dates Descending</option>
             <option value="wallet">Payments via wallet</option>
             <option value="wallet and paid">Valid Payments via wallet</option>
@@ -189,12 +194,28 @@
     public bool IsAdminAuthorized { get; set; }
     List<Product> selectedProducts = new();
     List<NewOrder> activeOrders = new();
+    public HubConnection hubConnection => signalR.HubConnection;
     protected override void OnInitialized()
     {
         if (orders.Count > 4)
+        {
             tableSizeClass = "large";
+        }
+        else
+        {
+            tableSizeClass = "scanty";
+        }
+
         activeOrders = orders;
-        users =  userController.ReadAllUsers().Result;
+        if (store.State().Users.Data.Count > 0)
+        {
+            users = store.State().Users.Data.ToList();
+        }
+        else
+        {
+            users = userController.ReadAllUsers().Result;
+        }
+        signalR.HubConnection.On<NewOrder>("NewOrderReceived", NewOrderReceived);
     }
     protected override void OnAfterRender(bool firstRender)
     {
@@ -207,7 +228,7 @@
         if (products.Count < 4)
             tableSizeClass = "scanty";
     }
-    private void ModifyOrder(NewOrder order)
+    public async void ModifyOrder(NewOrder order)
     {
         if (order.Status.Equals(OrderStatus.Pending) && IsAdminAuthorized)
         {
@@ -235,13 +256,34 @@
             order.Date = DateTime.Now;//For re-validating an order with the current date
             order.Status = OrderStatus.Pending;
         }
+
         var isAdded = orderController.AddNewOrderForEasyLifeUpdate(order);
+        if (isAdded.Result)
+        {
+            await signalR.HubConnection.SendAsync("NewOrderReceived", order);
+        }
     }
     private void ViewUser(string userId)
     {
         viewTable = "user";
         user = users.Find(u => u.Id.Equals(userId)) ?? new();
         tableSizeClass = "scanty";
+    }
+    private void NewOrderReceived(NewOrder order)
+    {
+        var orders = store.State().NewOrders.Data.ToList().Where(x => x.Id != order.Id).ToList();
+        orders.Insert(0, order);
+        store.UpdateNewOrders(orders);
+        if (IsAdminAuthorized)
+        {
+            activeOrders = store.State().NewOrders.Data.ToList();
+        }
+        else if(order.UserId.Equals(store.State().ActiveUser.User.Id))
+        {
+            activeOrders = store.State().NewOrders.Data.Where(x => x.UserId.Equals(store.State().ActiveUser.User.Id)).ToList();
+        }
+        count = 1;//initialize table count before UI refreshes
+        InvokeAsync(StateHasChanged);
     }
     private void QueryAllOrders(ChangeEventArgs e)
     {
@@ -250,6 +292,18 @@
         {
             case "all":
                 activeOrders = orders;
+                break;
+            case "today":
+                activeOrders = orders.Where(d => d.Date.Date.Equals(DateTime.Now.Date)).ToList();
+                break;
+            case "pending today":
+                activeOrders = orders.Where(d => d.Date.Date.Equals(DateTime.Now.Date) && d.Status.Equals(OrderStatus.Pending)).ToList();
+                break;
+            case "approved today":
+                activeOrders = orders.Where(d => d.Date.Date.Equals(DateTime.Now.Date) && d.Status.Equals(OrderStatus.Approved)).ToList();
+                break;
+            case "cancelled today":
+                activeOrders = orders.Where(d => d.Date.Date.Equals(DateTime.Now.Date) && d.Status.Equals(OrderStatus.Cancelled)).ToList();
                 break;
             case "descending":
                 activeOrders = orders.OrderByDescending(x => x.Date).ToList();

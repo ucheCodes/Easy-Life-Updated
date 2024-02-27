@@ -170,7 +170,7 @@
     font-size: 1.7rem;
     margin: .5rem 0;
 }
-.account .box:hover {
+.account .box:hover, .account .box.active {
     cursor: pointer;
     color: var(--main-color);
 }

@@ -1,9 +1,10 @@
 ﻿@inject IProductController productController
 @inject IStore store
+@inject SignalRService signalR
 @inject NavigationManager navigationManager
 @implements IDisposable
 
-@if (store.State().ProductItems.Products.Count == 0)
+@if (products.Count == 0)
 {
     <ProductDemo/>
 }
@@ -11,13 +12,12 @@ else
 {
     <section class="product">
         <ProductBanner />
-        <h1 class="heading">All <span>Products : @store.State().ProductItems.Products.Count</span></h1>
+        <h1 class="heading">@displayCategory <span>Products : @products.Count</span></h1>
         <div class="scroller-btns">
             <span @onclick="(() => GetCategoryProducts(all))" class="@GetActiveClass(all)">All</span>
             <span @onclick="(() => GetCategoryProducts(latest))" class="@GetActiveClass(latest)">Latest</span>
             @foreach (var cat in categories)
             {
-@*                <span @onclick="@(() => ToggleActiveClass(cat))" class="@GetActiveClass(cat)">@cat</span>*@
                 <span @onclick="(() => GetCategoryProducts(cat))" class="@GetActiveClass(cat)">@cat</span>
             }
         </div>
@@ -28,25 +28,21 @@ else
             if (m < 4)
                 range = increment * m;
             else
-                range = store.State().ProductItems.Products.Count;
+                range = products.Count;
             productAfterAdsCount = 0;
             <div class="box-container">
-                @for (var i = productIndex; i < store.State().ProductItems.Products.Count; i++)//foreach(var product in store.State().ProductItems.Products)
+                @for (var i = productIndex; i < products.Count; i++)
                 {
                     if (i == range) break;
-                    var product = store.State().ProductItems.Products[i];
+                    var product = products[i];
                     <div class="box">
                         @if (!string.IsNullOrWhiteSpace(product.Filepath))
                         {
-@*                            <div>
-                                <small>@product.Date.ToString("ddd, dd MMM yyyy")</small>
-                                <small>@product.Date.ToString("hh : mm tt")</small>
-                            </div>*@
                             <div @onclick="(() => View(product.Id))" class="img">
                                 <img loading="lazy" src="@product.Filepath" alt="product">
                             </div>
                             <div class="icons">
-                                @if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id) && store.State().ActiveUser.User.AllowAcess)
+                                @if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id) && store.State().ActiveUser.User.IsAdmin)
                                 {
                                     <i @onclick="(() => {showDel =! showDel; deleteId = product.Id;})" class="fas fa-trash"></i>
                                     <i @onclick="(() => EditProduct(product))" class="fa-solid fa-pen-to-square"></i>
@@ -94,6 +90,7 @@ else
     List<Product> products = new();
     bool showDel = false;
     string deleteId = "";
+    string displayCategory = "All";
     Product special = new();
     List<string> categories = new();
     char naira = (char)8358;
@@ -104,37 +101,62 @@ else
     int productIndex = 0;
     int range = 0;
     int productAfterAdsCount = 0;
+    bool isProductsUpdated = false;
+    public HubConnection hubConnection => signalR.HubConnection;
     [Inject]
     private IWebHostEnvironment? _environment { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
-        products = await productController.GetProducts();
-        if (products.Count > 0)
+        if(store.State().ProductItems.Products.Count > 0)
         {
-            products = (products.OrderByDescending(p => p.Date)).ToList<Product>();
-            store.UpdateProducts(products);
+            products = store.State().ProductItems.Products.ToList<Product>();
         }
-
+        else
+        {
+            products = await productController.GetProducts();
+            if (products.Count > 0)
+            {
+                products = (products.OrderByDescending(p => p.Date)).ToList<Product>();
+                store.UpdateProducts(products);
+            }
+        }
+        if (store.State().CategoryList.Categories.Count > 0)
+        {
+            categories = store.State().CategoryList.Categories.ToList<string>();
+        }
+        else
+        {
+            categories = await productController.GetCategories();
+            if (categories.Count > 0)
+            {
+                store.SetProductCategoryList(categories);
+            }
+        }
         InitializeIncrement();
-        categories = await productController.GetCategories();
+        signalR.HubConnection.On<List<Product>>("UpdateProducts", UpdateProductsViaSignalR);
         store.AddStateChangedListeners(() => { StateHasChanged(); });
     }
     protected override void OnAfterRender(bool firstRender)
     {
         productIndex = 0;
+        //if (isProductsUpdated)
+        //{
+        //    GetCategoryProducts(all);
+        //}
     }
     private void InitializeIncrement()
     {
-        if (store.State().ProductItems.Products.Count < 6)
+        int productCount = store.State().ProductItems.Products.Count;
+        if (productCount < 6)
         {
-            increment = store.State().ProductItems.Products.Count;
+            increment = productCount;
         }
-        else if (store.State().ProductItems.Products.Count >= 6)
+        else if (productCount >= 6)
         {
             increment = 6;
         }
-        else if (store.State().ProductItems.Products.Count >= 36)
+        else if (productCount >= 36)
         {
             increment = 12;
         }
@@ -160,21 +182,23 @@ else
         var _products = new List<Product>();
         if (cat == "latest")
         {
-            _products = (products.Where(p => DateTime.Now.Subtract(p.Date).TotalDays <= 7)).ToList<Product>();
+            _products = (store.State().ProductItems.Products.Where(p => DateTime.Now.Subtract(p.Date).TotalDays <= 7)).ToList<Product>();
         }
         else
         {
-            _products = (products.Where(p => p.Category == cat)).ToList<Product>();
+            _products = (store.State().ProductItems.Products.Where(p => p.Category == cat)).ToList<Product>();
         }
 
         if (_products.Count > 0)
         {
-            store.UpdateProducts(_products);
+            products = _products;
         }
         else
         {
-            store.UpdateProducts(products);
+            products = store.State().ProductItems.Products.ToList<Product>();
+            cat = "all";
         }
+        displayCategory = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(cat);
         ToggleActiveClass(cat);
     }
 
@@ -184,18 +208,25 @@ else
     }
     private async void DeleteProduct(string id)
     {
-        var isDel = await productController.DeleteProduct(id);
-        if (isDel)
+        bool isDel = false;
+        try
         {
-            var prd = products.FirstOrDefault(p => p.Id == id);
-            if (prd != null && prd.Id != "")
+            isDel = await productController.DeleteProduct(id);
+            if (isDel)
             {
-                DeleteImage(prd.Filepath);
-                products = (products.Where(p => p.Id != prd.Id).OrderByDescending(p => p.Date)).ToList<Product>();
-                store.UpdateProducts(products);
-
+                var prd = store.State().ProductItems.Products.FirstOrDefault(p => p.Id == id);
+                if (prd != null && prd.Id != "")
+                {
+                    DeleteImage(prd.Filepath);
+                    var prods = (store.State().ProductItems.Products.Where(p => p.Id != prd.Id).OrderByDescending(p => p.Date)).ToList<Product>();
+                    await signalR.HubConnection.SendAsync("UpdateProducts", prods);
+                }
+                showDel = !showDel;
             }
-            showDel = !showDel;
+        }
+        catch (Exception)
+        {
+            isDel = false;
         }
     }
     public void DeleteImage(string filePath)
@@ -225,6 +256,13 @@ else
     private void AddToCart(Product product)
     {
         store.AddToCart(product);
+    }
+    private void UpdateProductsViaSignalR(List<Product> _products)
+    {
+        products = _products;
+        store.UpdateProducts(products);
+        isProductsUpdated = true;
+        InvokeAsync(() => { StateHasChanged(); });
     }
     private void EditProduct(Product product)
     {

@@ -29,7 +29,7 @@
                     <div class="user">
                         <h4>
                             @rev.User.Username &nbsp;&nbsp;
-                            @if (store.State().ActiveUser.User.AllowAcess)
+                            @if (store.State().ActiveUser.User.IsAdmin || store.State().ActiveUser.User.Id.Equals(rev.User.Id))
                             {
                                 @if(deleteId == rev.Id)
                                 {
@@ -85,25 +85,30 @@
 
     protected override async Task OnInitializedAsync()
     {
-        reviews = (await rc.ReadAll()).OrderByDescending(r => r.Date).ToList();
+        if (store.State().Reviews.Data.Count > 0)
+        {
+            reviews = store.State().Reviews.Data.ToList();
+        }
+        else
+        {
+            reviews = (await rc.ReadAll()).OrderByDescending(r => r.Date).ToList();
+            store.SetProductReviews(reviews);
+        }
         signalR.HubConnection.On<Review>("AddReview", UpdateReviews);
         signalR.HubConnection.On<string>("DeleteReview", DeleteReview);
         store.AddStateChangedListeners(() => { StateHasChanged(); });
     }
     private void UpdateReviews(Review rev)
     {
-        reviews.Add(rev);
-        reviews = reviews.OrderByDescending(r => r.Date).ToList();
+        reviews.Insert(0,rev);
+        store.SetProductReviews(reviews);
         InvokeAsync(StateHasChanged);
     }
     private void DeleteReview(string id)
     {
-        var rev = reviews.Find(r => r.Id.Equals(id));
-        if (rev != null && rev.Id != "")
-        {
-            reviews.Remove(rev);
-            InvokeAsync(StateHasChanged);
-        }
+        reviews = reviews.Where(x => x.Id != id).ToList();
+        store.SetProductReviews(reviews);
+        InvokeAsync(StateHasChanged);
     }
     private void Rate(int i)
     {
@@ -112,10 +117,16 @@
     private async void Delete(string id)
     {
         var isDel = await rc.Delete(id);
-        if (isDel)
+        try
         {
-            deleteId = "";
-            await signalR.HubConnection.SendAsync("DeleteReview", id);
+            if (isDel)
+            {
+                deleteId = "";
+                await signalR.HubConnection.SendAsync("DeleteReview", id);
+            }
+        }
+        catch (Exception)
+        {
         }
     }
     private async void Submit()
@@ -126,23 +137,29 @@
         }
         else
         {
-            if (comment != "")
+            try
             {
-                review.Id = Guid.NewGuid().ToString();
-                review.User = store.State().ActiveUser.User;
-                review.Comment = comment;
-                review.Date = DateTime.Now;
-                review.StarRating = selectedRating;
-                var isAdded = await rc.Create(review);
-                if (isAdded)
+                if (comment != "")
                 {
-                    await signalR.HubConnection.SendAsync("AddReview", review);
-                    review = new();
-                    comment = "";
-                    message = "";
+                    review.Id = Guid.NewGuid().ToString();
+                    review.User = store.State().ActiveUser.User;
+                    review.Comment = comment;
+                    review.Date = DateTime.Now;
+                    review.StarRating = selectedRating;
+                    var isAdded = await rc.Create(review);
+                    if (isAdded)
+                    {
+                        await signalR.HubConnection.SendAsync("AddReview", review);
+                        review = new();
+                        comment = "";
+                        message = "";
+                    }
                 }
+                else { message = "kindly type your review!!!"; }
             }
-            else{ message = "kindly type your review!!!"; }
+            catch (Exception)
+            {
+            }
         }
     }
     public void Dispose()

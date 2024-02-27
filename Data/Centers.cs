@@ -2,6 +2,11 @@
 {
     public static class Centers
     {
+        public static List<string> locations { get; } = new List<string>
+        {
+            "UST, PH City, Rivers State",
+            "Trans - Amadi layout, PH City, Rivers State"
+        };
         public static List<string> states { get; } = new List<string>
         {
             "Choose nearest Location",

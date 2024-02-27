@@ -49,7 +49,7 @@ else
 }
 </div>
     <div class="back">
-        @if (store.State().ActiveUser.User.AllowAcess)
+        @if (store.State().ActiveUser.User.IsAdmin || store.State().ActiveUser.User.IsVendor)
         {
             <button @onclick="back" class="center-btn">Back to Orders <i class="fa-sharp fa-solid fa-arrow-right"></i></button>
         }
