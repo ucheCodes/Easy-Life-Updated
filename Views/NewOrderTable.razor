@@ -126,15 +126,15 @@
                                 {
                                     <td class="yellow">@ord.PaymentStatus</td>
                                 }
-                                @if (store.State().ActiveUser.User.IsAdmin && IsAdminAuthorized)
+                                @if ((store.State().ActiveUser.User.IsAdmin || store.State().ActiveUser.User.IsVendor) && IsAdminAuthorized)
                                 {
                                     <td class="icon" @onclick="(() => ViewUser(ord.UserId))"><i class="fas fa-user"></i></td>
                                 }
-                                @if (ord.Status.Equals(OrderStatus.Pending) && IsAdminAuthorized && store.State().ActiveUser.User.IsAdmin)
+                                @if (ord.Status.Equals(OrderStatus.Pending) && IsAdminAuthorized && (store.State().ActiveUser.User.IsAdmin || store.State().ActiveUser.User.IsVendor))
                                 {
                                     <td @onclick="(() => ModifyOrder(ord))" class="log cursor-pointer">Approve Order</td>
                                 }
-                                else if (ord.Status.Equals(OrderStatus.Approved) && IsAdminAuthorized && store.State().ActiveUser.User.IsAdmin)
+                                else if (ord.Status.Equals(OrderStatus.Approved) && IsAdminAuthorized && (store.State().ActiveUser.User.IsAdmin || store.State().ActiveUser.User.IsVendor))
                                 {
                                     <td @onclick="(() => ModifyOrder(ord))" class="yellow cursor-pointer">Nullify Order</td>
                                 }
@@ -256,7 +256,11 @@
             order.Date = DateTime.Now;//For re-validating an order with the current date
             order.Status = OrderStatus.Pending;
         }
-
+        //Add a new property to NewOrder that will contain approving Vendor Id to track the vendor that dispatches the product
+        //if (IsAdminAuthorized && (store.State().ActiveUser.User.IsAdmin || store.State().ActiveUser.User.IsVendor))
+        //{
+        //    //add order.ApprovingVendor id
+        //}
         var isAdded = orderController.AddNewOrderForEasyLifeUpdate(order);
         if (isAdded.Result)
         {

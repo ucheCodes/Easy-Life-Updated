@@ -17,8 +17,11 @@
             <option value="2">View All Users Wallet</option>
             <option value="3">View Wallet Notifications</option>
             <option value="4">Add Account Info</option>
+            <option value="5">Dispatch Products to Vendor</option>
         }
-        <option value="5">View All New Orders</option>
+        <option value="6">View All New Orders</option>
+        <option value="7">View Dispatched</option>
+        <option value="8">Manage Product statistics</option>
     </select>
     @switch (selected)
     {
@@ -60,7 +63,13 @@
             </div>
             break;
         case 5:
+            <DispatchProducts />
+            break;
+        case 6:
             <NewOrderTable orders="newOrders" TableTitle="Orders" IsAdminAuthorized="true" />
+            break;
+        case 7:
+            <ViewDispatchedProducts />
             break;
         default:
         <div></div>
@@ -69,7 +78,7 @@
 </section>
 
 @code{
-    int selected = 5;
+    int selected = 6;
     char naira = (char)8358;
     string msgClass = "error";
     string walletSearchValue = "";

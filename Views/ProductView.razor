@@ -35,31 +35,34 @@ else
                 {
                     if (i == range) break;
                     var product = products[i];
-                    <div class="box">
-                        @if (!string.IsNullOrWhiteSpace(product.Filepath))
-                        {
-                            <div @onclick="(() => View(product.Id))" class="img">
-                                <img loading="lazy" src="@product.Filepath" alt="product">
-                            </div>
-                            <div class="icons">
-                                @if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id) && store.State().ActiveUser.User.IsAdmin)
-                                {
-                                    <i @onclick="(() => {showDel =! showDel; deleteId = product.Id;})" class="fas fa-trash"></i>
-                                    <i @onclick="(() => EditProduct(product))" class="fa-solid fa-pen-to-square"></i>
-                                    @if (showDel && product.Id == deleteId)
+                    @if (product.IsProductInStock)
+                    {
+                        <div class="box">
+                            @if (!string.IsNullOrWhiteSpace(product.Filepath))
+                            {
+                                <div @onclick="(() => View(product.Id))" class="img">
+                                    <img loading="lazy" src="@product.Filepath" alt="product">
+                                </div>
+                                <div class="icons">
+                                    @if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id) && store.State().ActiveUser.User.IsAdmin)
                                     {
-                                        <span>Confirm <i @onclick="(() => DeleteProduct(product.Id))" class="fas fa-trash"></i></span>
+                                        <i @onclick="(() => {showDel =! showDel; deleteId = product.Id;})" class="fas fa-trash"></i>
+                                        <i @onclick="(() => EditProduct(product))" class="fa-solid fa-pen-to-square"></i>
+                                        @if (showDel && product.Id == deleteId)
+                                        {
+                                            <span>Confirm <i @onclick="(() => DeleteProduct(product.Id))" class="fas fa-trash"></i></span>
+                                        }
                                     }
-                                }
-                            </div>
-                            <h3>
-                                @product.Name &nbsp;&nbsp;
-                                <i @onclick="(() =>AddToCart(product))" class="fas fa-shopping-cart"></i>
-                            </h3>
-                            <p>@naira @product.Price.ToString("N0")</p>
-                            <button @onclick="(() =>ShowAndAddToCart(product))" class="btn">Buy Now</button>
-                        }
-                    </div>
+                                </div>
+                                <h3>
+                                    @product.Name &nbsp;&nbsp;
+                                    <i @onclick="(() =>AddToCart(product))" class="fas fa-shopping-cart"></i>
+                                </h3>
+                                <p>@naira @product.Price.ToString("N0")</p>
+                                <button @onclick="(() =>ShowAndAddToCart(product))" class="btn">Buy Now</button>
+                            }
+                        </div>
+                    }
                     productAfterAdsCount++;
                     productIndex++;
                 }
@@ -101,7 +104,7 @@ else
     int productIndex = 0;
     int range = 0;
     int productAfterAdsCount = 0;
-    bool isProductsUpdated = false;
+    //bool isProductsUpdated = false;
     public HubConnection hubConnection => signalR.HubConnection;
     [Inject]
     private IWebHostEnvironment? _environment { get; set; }
@@ -140,10 +143,6 @@ else
     protected override void OnAfterRender(bool firstRender)
     {
         productIndex = 0;
-        //if (isProductsUpdated)
-        //{
-        //    GetCategoryProducts(all);
-        //}
     }
     private void InitializeIncrement()
     {
@@ -261,7 +260,7 @@ else
     {
         products = _products;
         store.UpdateProducts(products);
-        isProductsUpdated = true;
+        //isProductsUpdated = true;
         InvokeAsync(() => { StateHasChanged(); });
     }
     private void EditProduct(Product product)

@@ -79,7 +79,7 @@
             }
             else
             {
-                <p class="p">Kindly login to enable Wallet</p>
+                <p class="p">Kindly surf the shop menu first to initialize your wallet</p>
             }
         break;
         case 2:
@@ -206,6 +206,16 @@
         signalR.HubConnection.On<NewOrder>("NewOrderReceived", NewOrderReceived);
         store.AddStateChangedListeners(() => { StateHasChanged(); });
     }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (store.State().ActiveUser.User.Id != "" && n.Count > 0 && newOrders.Count == 0)
+        {
+            newOrders = n.Where(d => d.UserId.Equals(store.State().ActiveUser.User.Id)).OrderByDescending(x => x.Date).ToList();
+            approved = newOrders.Where(x => x.Status.Equals(OrderStatus.Approved)).ToList();
+            newOrdersCount = newOrders.Where(x => x.IsViewed.Equals(false)).ToList().Count;
+            GetNotifications();
+        }    
+    }
     private void EditAccount()
     {
         store.State().ActiveUser.User.IsEditAccount = true;
@@ -228,8 +238,11 @@
     }
     private void GetNotifications()
     {
-        notifications = store.State().AllWalletsInfo.AccountNotifications.Where(z => z.UserId.Equals(store.State().ActiveUser.User.Id)).ToList();
-        notificationsCount = notifications.Where(n => !n.IsViewed).Count();
+        if (store.State().AllWalletsInfo.AccountNotifications.Count > 0)
+        {
+            notifications = store.State().AllWalletsInfo.AccountNotifications.Where(z => z.UserId.Equals(store.State().ActiveUser.User.Id)).ToList();
+            notificationsCount = notifications.Where(n => !n.IsViewed).Count();
+        }
     }
     private void LogNewUser()
     {
@@ -318,12 +331,22 @@
             notificationsCount = 0;
         }
     }
-    private void GetWalletData()
+    private async void GetWalletData()
     {
-        if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id))
+        if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id) && store.State().AllWalletsInfo.Wallets.Count > 0)
         {
             userWallet = store.State().AllWalletsInfo.Wallets.FirstOrDefault(x => x.UserId.Equals(store.State().ActiveUser.User.Id)) ?? new();
         }
+        else if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id) && userWallet.WalletId == "")
+        {
+            EncryptionKeeper encWalletData = await accountController.GetEncryptedData(store.State().ActiveUser.User.Id);
+            if (!string.IsNullOrEmpty(encWalletData.EncryptedSerializedData) && encWalletData.DataFrom.Equals(DataFrom.wallet))
+            {
+                string serializedWalletData = encryptionHelper.Decrypt(encWalletData.EncryptedSerializedData, encWalletData.EncryptionKey, encWalletData.EncryptionIV);
+                userWallet = JsonConvert.DeserializeObject<Wallet>(serializedWalletData) ?? new();
+            }
+        }
+
     }
     private void OnNewWalletUpdate(Wallet wallet, AccountNotification notif)
     {

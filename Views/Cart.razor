@@ -9,7 +9,8 @@
 					<a href="/account" class="btn">Fund Wallet</a>	
 				}				else if (paymentChannel != "null")
 				{					<a @onclick="OrderUpdatedForEasyLifeOnly" class="btn">Pay @naira @store.State().CartTotal.Total.ToString("N0")</a>				}			</div>	</div>}else{	<div>		<p class="log p">@cartMsg</p>	</div>}@code {
-	char naira = (char)8358;	string message = "";	string msg = "";
+	char naira = (char)8358;	string message = "";
+	string msg = "";
 	string msgClass = "error";
 	string cartMsg = "Empty Cart";	string paymentChannel = "null";	string domainName = "";	bool isEmailValid = false;	bool isMobileValid = false;	bool isUserWalletInitialized = false;
 	bool editAccount = false;
@@ -181,7 +182,6 @@
 		{
 			userWallet = store.State().AllWalletsInfo.Wallets.FirstOrDefault(x => x.UserId.Equals(store.State().ActiveUser.User.Id)) ?? new();
 		}
-		/*	if (!string.IsNullOrEmpty(store.State().ActiveUser.User.Id))	{		EncryptionKeeper encWalletData = await accountController.GetEncryptedData(store.State().ActiveUser.User.Id);		if (!string.IsNullOrEmpty(encWalletData.EncryptedSerializedData) && encWalletData.DataFrom.Equals(DataFrom.wallet))		{			string serializedWalletData = encryptionHelper.Decrypt(encWalletData.EncryptedSerializedData, encWalletData.EncryptionKey, encWalletData.EncryptionIV);			userWallet = JsonConvert.DeserializeObject<Wallet>(serializedWalletData) ?? new();			isUserWalletInitialized = true;		}	}	*/
 	}	private async void Checkout()	{
 		try
 		{

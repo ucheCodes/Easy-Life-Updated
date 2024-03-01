@@ -63,6 +63,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ291bnRlci5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/peter soft/source/repos/Easy Life/HKBlog/HKBlog.UI/Views/DispatchProducts.razor]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRGlzcGF0Y2hQcm9kdWN0cy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/peter soft/source/repos/Easy Life/HKBlog/HKBlog.UI/Views/DynamicTables.razor]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRHluYW1pY1RhYmxlcy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
@@ -73,6 +77,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/peter soft/source/repos/Easy Life/HKBlog/HKBlog.UI/Views/LoginForm.razor]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcTG9naW5Gb3JtLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/peter soft/source/repos/Easy Life/HKBlog/HKBlog.UI/Views/ManageSales.razor]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcTWFuYWdlU2FsZXMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/peter soft/source/repos/Easy Life/HKBlog/HKBlog.UI/Views/NewOrderTable.razor]
@@ -137,6 +145,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/peter soft/source/repos/Easy Life/HKBlog/HKBlog.UI/Views/UserWalletBalanceView.razor]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVXNlcldhbGxldEJhbGFuY2VWaWV3LnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/peter soft/source/repos/Easy Life/HKBlog/HKBlog.UI/Views/ViewDispatchedProducts.razor]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVmlld0Rpc3BhdGNoZWRQcm9kdWN0cy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/peter soft/source/repos/Easy Life/HKBlog/HKBlog.UI/Views/ViewProduct.razor]

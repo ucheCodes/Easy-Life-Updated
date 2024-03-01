@@ -23,8 +23,8 @@
                     @if (store.State().ActiveUser.User != null && store.State().ActiveUser.User.IsAdmin)
                     {
                         <th>Is Vendor?</th>
+                        <th>Delete</th>
                     }
-                    <th>Delete</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -57,8 +57,8 @@
                                 <input type="checkbox" @onchange="(() => GrantAcess(user))" />
                             </td>
                         }
+                        <td @onclick="(() => DeleteUser(user.Id))"><i class="fas fa-trash icon cursor-pointer"></i></td>
                     }
-                    <td @onclick="(() => DeleteUser(user.Id))"><i class="fas fa-trash icon cursor-pointer"></i></td>
                 </tr>
                 count++;
                 }

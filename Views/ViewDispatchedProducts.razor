@@ -1,0 +1,84 @@
+﻿@inject IStore store
+@inject IProductController productController
+
+<section class="dynamic-table">
+    <div class="table-header">
+        <h1 class="heading">Vendors</h1>
+    </div>
+    <div class="table @tableSizeClass">
+        <div class="table-body">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Quantity</th>
+                        <th>Image</th>
+                        <th>Select Vendor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in dispatchedProducts)
+                    {
+                        <tr>
+                            <td>@d.Product.Name</td>
+                            <td>@d.Product.Price</td>
+                            <td>@d.Quantity</td>
+                            <td><img class="table-img" src="@d.Product.Filepath" alt="No img" /></td>
+                            @if (d.VendorId == store.State().ActiveUser.User.Id && d.DispatchStatus.Equals(OrderStatus.Approved))
+                            {
+                                <td @onclick="(() => ModifyDispatch(d))" class="yellow cursor-pointer">Nullify</td>
+                            }
+                            else if (d.DispatchStatus.Equals(OrderStatus.Pending))
+                            {
+                                <td @onclick="(() => ModifyDispatch(d))" class="error cursor-pointer">Approve</td>
+                            }
+                            else if (d.DispatchStatus.Equals(OrderStatus.Cancelled))
+                            {
+                                <td @onclick="(() => ModifyDispatch(d))" class="log cursor-pointer">Re - Approve</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+@code {
+    List<DispatchProduct> dispatchedProducts = new();
+    string tableSizeClass = "";
+    int count = 1;
+    protected async override Task OnInitializedAsync()
+    {
+        if (store.State().Dispatched.Products.Count > 0)
+        {
+            dispatchedProducts = store.State().Dispatched.Products.ToList();
+        }
+        else
+        {
+            dispatchedProducts = await productController.GetDispatchedProducts();
+            store.UpdateDispatchedProducts(dispatchedProducts);
+        }
+    }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        count = 1;
+        InitializeTableSize();
+    }
+    public void InitializeTableSize()
+    {
+        if (dispatchedProducts.Count > 5)
+        {
+            tableSizeClass = "large";
+        }
+        else
+        {
+            tableSizeClass = "scanty";
+        }
+    }
+    void ModifyDispatch(DispatchProduct d)
+    {
+        
+    }
+}

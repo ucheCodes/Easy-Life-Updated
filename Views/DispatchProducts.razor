@@ -1,0 +1,255 @@
+﻿@inject IStore store
+@inject IProductController productController
+@inject SignalRService signalR
+
+<section class="dynamic-table">
+    <div class="table-header">
+        <h1 class="heading">Vendors</h1>
+    </div>
+        <div class="table @tableSizeClass">
+        <div class="table-body">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Mobile</th>
+                        <th>Image</th>
+                        <th>Select Vendor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in vendors)
+                    {
+                        <tr>
+                            <td>@user.Username</td>
+                            <td>@user.Email</td>
+                            <td>@user.Mobile</td>
+                            <td><img class="table-img" src="@user.Filepath" alt="No img" /></td>
+                            @if (selectedVendor.Id == user.Id)
+                            {
+                                <td class="icon"><i class="fas fa-check-double log"></i></td>
+                            }
+                            else
+                            {
+                                <td @onclick="(() => SelectVendor(user))"><input type="checkbox"></td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+         </div>
+        </div>
+</section>
+
+<section class="dynamic-table">
+    <div class="table-header">
+        <h1 class="heading">Dispatched Products</h1>
+    </div>
+    <select @onchange="ToggleDispatchList" class="_input">
+        <option value="all">View All Products</option>
+        <option value="dispatch">View Dispatched List</option>
+        <option value="non-dispatch">View Non Dispatched</option>
+    </select>
+    <div class="table @tableSizeClass">
+        <div class="table-body">
+            <table>
+                <thead>
+                    <tr>
+                        <th>S/N</th>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Qty to Dispatch</th>
+                        <th>Is Product In Stock</th>
+                        <th>Image</th>
+                        <th>Dispatch</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var product in products)
+                    {
+                        <tr>
+                            <td>@count</td>
+                            <td>@product.Name</td>
+                            <td>@product.Price</td>
+                        @if (productQty.ContainsKey(product.Id))
+                        {
+                            <td><input class="number" typeof="number" @bind="productQty[product.Id]"></td>
+                        }
+                        @if (product.IsProductInStock)
+                        {
+                             <td @onclick="(() => ModifyProductInStock(product))" class="icon"><i class="fas fa-check log"></i></td>
+                        }
+                        else
+                        {
+                             <td @onclick="(() => ModifyProductInStock(product))" class="icon"><i class="fas fa-x error"></i></td>
+                        }
+                            <td><img class="table-img" src="@product.Filepath" alt="No img" /></td>
+                        @if (ProductsAdded.Contains(product))
+                        {
+                                <td @onclick="(() => RemoveFromDispatchList(product))" class="icon error"><i class="fas fa-trash-alt"></i></td>
+                        }
+                        else
+                        {
+                             <td @onclick="(() => AddToDispatchList(product))" class="icon log"><i class="fas fa-shopping-bag"></i></td>
+                        }
+                        </tr>
+                        count++;
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="center-div">
+        <p class="p @msgClass">@message</p>
+        <button @onclick="AddDispatch" class="btn">Submit Dispatch</button>
+    </div>
+</section>
+
+@code {
+
+    List<Product> products = new();
+    string tableSizeClass = "";
+    string message = "";
+    string msgClass = "";
+    int count = 1;
+    User selectedVendor = new();
+    Dictionary<string, int> productQty = new();
+    List<Product> ProductsAdded = new();
+    List<User> vendors = new();
+    public HubConnection hubConnection => signalR.HubConnection;
+    protected override async Task OnInitializedAsync()
+    {
+        if(store.State().ProductItems.Products.Count > 0)
+        {
+            products = store.State().ProductItems.Products.ToList<Product>();
+        }
+        else
+        {
+            products = await productController.GetProducts();
+            if (products.Count > 0)
+            {
+                products = (products.OrderByDescending(p => p.Date)).ToList<Product>();
+                store.UpdateProducts(products);
+            }
+        }
+        vendors = store.State().Users.Data.Where(v => v.IsVendor).ToList();
+        InitializeProductQuantities();
+    }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        count = 1;
+        InitializeTableSize();
+    }
+    public void InitializeTableSize()
+    {
+        if (products.Count > 5)
+        {
+            tableSizeClass = "large";
+        }
+        else
+        {
+            tableSizeClass = "scanty";
+        }
+    }
+    public void InitializeProductQuantities()
+    {
+        products.ForEach(x => productQty.Add(x.Id, 0));
+    }
+    public async void ModifyProductInStock(Product product)
+    {
+        try
+        {
+            var _products = store.State().ProductItems.Products.ToList<Product>();
+            product.IsProductInStock = !product.IsProductInStock;
+            var isAdded = await productController.AddProduct(product);
+            if (isAdded)
+            {
+                var isExist = _products.Any(p => p.Id == product.Id);
+                if (isExist)
+                {
+                    _products = _products.Where(p => p.Id != product.Id).ToList();
+                }
+                _products.Insert(0, product);
+                await signalR.HubConnection.SendAsync("UpdateProducts", _products);
+            }
+        }
+        catch (Exception)
+        {
+        }
+    }
+    private void SelectVendor(User vendor)
+    {
+        selectedVendor = vendor;
+    }
+    public void AddToDispatchList(Product product)
+    {
+        if (!ProductsAdded.Contains(product) &&  productQty[product.Id] > 0)
+        {
+            ProductsAdded.Add(product);
+        }
+    }
+    public void RemoveFromDispatchList(Product product)
+    {
+        if (ProductsAdded.Contains(product))
+        {
+            ProductsAdded.Remove(product);
+        }
+    }
+    private void AddDispatch()
+    {
+        bool isAdded = false;
+        if(ProductsAdded.Count > 0 && selectedVendor.Id != "")
+        {
+            foreach (var product in ProductsAdded)
+            {
+                var dispatchedProducts = new DispatchProduct()
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Date = DateTime.Now,
+                        Product = product,
+                        Quantity = productQty[product.Id],
+                        VendorId = selectedVendor.Id,
+                        AdminId = store.State().ActiveUser.User.Id
+                    };
+                isAdded = productController.AddDispatchedProducts(dispatchedProducts).Result;
+            }
+            if (isAdded)
+            {
+                ProductsAdded = new();
+                message = "Dispatch data saved successfully! Cheers!!!";
+                msgClass = "log";
+            }
+        }
+        else
+        {
+            message = "Dispatch products and vendor must be selected";
+            msgClass = "error";
+        }
+    }
+    public void ToggleDispatchList(ChangeEventArgs e)
+    {
+        string value = e.Value?.ToString() ?? "";
+        switch (value)
+        {
+            case "all":
+                products = store.State().ProductItems.Products.ToList<Product>();
+                break;
+            case "dispatch":
+                products = store.State().ProductItems.Products.Where(p => ProductsAdded.Contains(p)).ToList<Product>();//ProductsAdded;
+                break;
+            case "non-dispatch":
+                products = store.State().ProductItems.Products.Where(p => !ProductsAdded.Contains(p)).ToList<Product>();
+                break;
+            default:
+                products = store.State().ProductItems.Products.ToList<Product>();
+                break;
+        }
+        InitializeTableSize();
+    }
+    public void Dispose()
+    {
+        ProductsAdded = new();
+        products = new();
+    }
+}
