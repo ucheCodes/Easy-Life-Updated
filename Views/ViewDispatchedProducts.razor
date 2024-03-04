@@ -13,31 +13,47 @@
                         <th>Name</th>
                         <th>Price</th>
                         <th>Quantity</th>
+                        <th>Is Approved</th>
                         <th>Image</th>
                         <th>Select Vendor</th>
+                        @if (store.State().ActiveUser.User.IsAdmin)
+                        {
+                            <th>Delete</th>
+                        }
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var d in dispatchedProducts)
                     {
-                        <tr>
-                            <td>@d.Product.Name</td>
-                            <td>@d.Product.Price</td>
-                            <td>@d.Quantity</td>
-                            <td><img class="table-img" src="@d.Product.Filepath" alt="No img" /></td>
-                            @if (d.VendorId == store.State().ActiveUser.User.Id && d.DispatchStatus.Equals(OrderStatus.Approved))
-                            {
-                                <td @onclick="(() => ModifyDispatch(d))" class="yellow cursor-pointer">Nullify</td>
-                            }
-                            else if (d.DispatchStatus.Equals(OrderStatus.Pending))
-                            {
-                                <td @onclick="(() => ModifyDispatch(d))" class="error cursor-pointer">Approve</td>
-                            }
-                            else if (d.DispatchStatus.Equals(OrderStatus.Cancelled))
-                            {
-                                <td @onclick="(() => ModifyDispatch(d))" class="log cursor-pointer">Re - Approve</td>
-                            }
-                        </tr>
+                        @if (d.VendorId == store.State().ActiveUser.User.Id || store.State().ActiveUser.User.IsAdmin)
+                        {
+                            <tr>
+                                <td>@d.Product.Name</td>
+                                <td>@d.Product.Price</td>
+                                <td>@d.Quantity</td>
+                                @if (d.DispatchStatus == OrderStatus.Approved)
+                                {
+                                    <td class="icon"><i class="fas fa-check log"></i></td>
+                                }
+                                else
+                                {
+                                    <td class="icon"><i class="fas fa-x error"></i></td>
+                                }
+                                <td><img class="table-img" src="@d.Product.Filepath" alt="No img" /></td>
+                                @if ( d.DispatchStatus.Equals(OrderStatus.Approved))
+                                {
+                                    <td @onclick="(() => ModifyDispatch(d))" class="yellow cursor-pointer">Cancel</td>
+                                }
+                                else if (d.DispatchStatus.Equals(OrderStatus.Pending))
+                                {
+                                    <td @onclick="(() => ModifyDispatch(d))" class="error cursor-pointer">Not Approved</td>
+                                }
+                                @if (store.State().ActiveUser.User.IsAdmin)
+                                {
+                                    <td @onclick="(() => DeleteDispatch(d.Id))" class="icon"><i class="fas fa-trash error"></i></td>
+                                }
+                            </tr>
+                        }
                     }
                 </tbody>
             </table>
@@ -53,11 +69,12 @@
     {
         if (store.State().Dispatched.Products.Count > 0)
         {
-            dispatchedProducts = store.State().Dispatched.Products.ToList();
+            dispatchedProducts = store.State().Dispatched.Products.OrderBy(p => p.VendorId).OrderByDescending(x => x.Date).ToList();
         }
         else
         {
-            dispatchedProducts = await productController.GetDispatchedProducts();
+            var _dispatchedProducts = await productController.GetDispatchedProducts();
+            dispatchedProducts = _dispatchedProducts.OrderBy(p => p.VendorId).OrderByDescending(x => x.Date).ToList();
             store.UpdateDispatchedProducts(dispatchedProducts);
         }
     }
@@ -76,6 +93,10 @@
         {
             tableSizeClass = "scanty";
         }
+    }
+    private async void DeleteDispatch(string id)
+    {
+        var del = await productController.DeleteDispatchedProduct(id);
     }
     void ModifyDispatch(DispatchProduct d)
     {

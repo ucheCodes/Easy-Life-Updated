@@ -122,11 +122,12 @@
     {
         if(store.State().ProductItems.Products.Count > 0)
         {
-            products = store.State().ProductItems.Products.ToList<Product>();
+            products = store.State().ProductItems.Products.OrderBy(x => x.Name).ToList<Product>();
         }
         else
         {
-            products = await productController.GetProducts();
+            var _products = await productController.GetProducts();
+            products = _products.OrderBy(x => x.Name).ToList();
             if (products.Count > 0)
             {
                 products = (products.OrderByDescending(p => p.Date)).ToList<Product>();
